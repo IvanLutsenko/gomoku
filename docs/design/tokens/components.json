@@ -1,0 +1,92 @@
+{
+  "buttons": {
+    "primary": {
+      "bg": "ink",
+      "fg": "paper",
+      "border": null,
+      "padding": [18, 24],
+      "padding_compact": [13, 16],
+      "font_style": "button",
+      "corner_radius": 0,
+      "min_height": 52
+    },
+    "secondary": {
+      "bg": "transparent",
+      "fg": "ink",
+      "border": { "color": "line_firm", "width": 1 },
+      "padding": [18, 24],
+      "padding_compact": [13, 16],
+      "font_style": "button",
+      "corner_radius": 0,
+      "min_height": 52
+    },
+    "tertiary_text": {
+      "bg": "transparent",
+      "fg": "muted",
+      "border": null,
+      "padding": [0, 0],
+      "font_style": "body",
+      "icon_left": "← "
+    },
+    "icon_round": {
+      "bg": "transparent",
+      "fg": "ink",
+      "border": { "color": "line_firm", "width": 1 },
+      "size": 36,
+      "corner_radius": 18
+    }
+  },
+  "segmented_control": {
+    "container_border": { "color": "line_firm", "width": 1 },
+    "item": {
+      "padding": [12, 0],
+      "font_style": "caption",
+      "active_bg": "ink",
+      "active_fg": "paper",
+      "inactive_fg": "ink",
+      "border_left": { "color": "line_firm", "width": 1, "first_item": false }
+    }
+  },
+  "toggle": {
+    "size": [44, 24],
+    "track_off_light": { "rgba": [0, 0, 0, 0.15] },
+    "track_off_dark":  { "rgba": [1, 0.992, 0.961, 0.18] },
+    "track_on": "ink",
+    "thumb": "paper",
+    "thumb_size": 20,
+    "thumb_inset": 2,
+    "tween_ms": 200
+  },
+  "row": {
+    "padding": [14, 0],
+    "divider": { "color": "line", "width": 1 }
+  },
+  "stone": {
+    "shadow": { "color": "#000000", "alpha": 0.30, "y": 1, "blur": 2 },
+    "last_move_dot_radius": 2,
+    "win_outline_width": 1.5
+  },
+  "footer_dot": {
+    "size": 6,
+    "color": "gold",
+    "gap": 8
+  },
+  "help_section": {
+    "ideogram_color": "gold",
+    "ideogram_width": 32,
+    "row_gap": 16,
+    "title_size": 16,
+    "title_weight": 600,
+    "body_color": "ink_soft",
+    "body_size": 14,
+    "section_gap": 24
+  },
+  "footer_meta": {
+    "text": "2026 · KORGE EDITION",
+    "size": 11,
+    "letter_spacing": 2,
+    "uppercase": true,
+    "color": "muted",
+    "lead_dot_color": "gold"
+  }
+}

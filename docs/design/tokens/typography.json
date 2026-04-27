@@ -1,0 +1,27 @@
+{
+  "families": {
+    "serif":     { "name": "Noto Serif",    "weights": [400, 600], "italic": true },
+    "serif_jp":  { "name": "Noto Serif JP", "weights": [400, 600], "italic": false },
+    "ui":        { "name": "Inter",         "weights": [400, 500, 600, 700], "italic": false }
+  },
+  "styles": {
+    "display":         { "family": "serif_jp", "size": 56, "weight": 400, "letter_spacing": -1 },
+    "title":           { "family": "serif",    "size": 36, "weight": 400, "letter_spacing": 0 },
+    "subtitle":        { "family": "serif",    "size": 22, "weight": 400, "letter_spacing": 0 },
+    "body":            { "family": "ui",       "size": 14, "weight": 400, "letter_spacing": 0 },
+    "body_strong":     { "family": "ui",       "size": 14, "weight": 600, "letter_spacing": 0 },
+    "button":          { "family": "ui",       "size": 16, "weight": 500, "letter_spacing": 0.3 },
+    "button_small":    { "family": "ui",       "size": 14, "weight": 500, "letter_spacing": 0.3 },
+    "caption":         { "family": "ui",       "size": 13, "weight": 400, "letter_spacing": 0 },
+    "caption_italic":  { "family": "serif",    "size": 13, "weight": 400, "italic": true },
+    "meta":            { "family": "ui",       "size": 11, "weight": 500, "letter_spacing": 1.5, "uppercase": true },
+    "label_caps":      { "family": "ui",       "size": 12, "weight": 500, "letter_spacing": 2,   "uppercase": true },
+    "tracking_brand":  { "family": "ui",       "size": 12, "weight": 500, "letter_spacing": 5,   "uppercase": true },
+    "ideogram":        { "family": "serif_jp", "size": 28, "weight": 400 }
+  },
+  "line_height": {
+    "title": 1.0,
+    "body":  1.6,
+    "tight": 1.1
+  }
+}

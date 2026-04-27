@@ -1,0 +1,41 @@
+{
+  "spacing": {
+    "xs":  4,
+    "sm":  8,
+    "md":  14,
+    "lg":  24,
+    "xl":  32,
+    "2xl": 40,
+    "screen_padding_h": 24,
+    "screen_padding_top": 20,
+    "screen_padding_bottom": 28
+  },
+  "radius": {
+    "none": 0,
+    "toggle_thumb": 10,
+    "theme_button": 18,
+    "stone": 9999
+  },
+  "stroke": {
+    "grid_line":     0.6,
+    "border":        1,
+    "border_thick":  1.5,
+    "vein_main":     1.4,
+    "vein_glow_mul": 2.6,
+    "vein_hi_mul":   0.4
+  },
+  "viewport": {
+    "base_width":  360,
+    "base_height": 720,
+    "aspect": "9:18",
+    "orientation": "portrait"
+  },
+  "board": {
+    "size_cells":   15,
+    "cell_px":      22,
+    "padding_px":   14,
+    "stone_radius_ratio": 0.42,
+    "hoshi_radius": 1.8,
+    "hoshi_points": [[3,3],[3,11],[7,7],[11,3],[11,11]]
+  }
+}

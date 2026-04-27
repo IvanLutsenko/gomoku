@@ -5,7 +5,9 @@ plugins {
 }
 
 korge {
-	id = "com.sample.demo"
+	id = "com.awac.gomoku"
+    icon = file("resources/icon.png")
+    androidAppendBuildGradle("android.defaultConfig.multiDexEnabled true\n")
 
 // To enable all targets at once
 
@@ -23,6 +25,9 @@ korge {
 	targetAndroid()
 
 	serializationJson()
+
+    // Для NativeVibration на Android.
+    androidPermission("android.permission.VIBRATE")
 }
 
 

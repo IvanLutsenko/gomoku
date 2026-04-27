@@ -1,0 +1,38 @@
+{
+  "$comment": "Single source of truth for all colors. Hex unless noted. Alpha given as separate channel.",
+  "light": {
+    "paper":      { "hex": "#f5f0e6" },
+    "paper_deep": { "hex": "#ede5d4" },
+    "surface":    { "hex": "#faf6ec" },
+    "ink":        { "hex": "#1a1814" },
+    "ink_soft":   { "hex": "#3a3530" },
+    "muted":      { "hex": "#8a8378" },
+    "line":       { "hex": "#1a1814", "alpha": 0.10 },
+    "line_firm":  { "hex": "#1a1814", "alpha": 0.32 },
+    "vermillion": { "hex": "#c1442a" },
+    "gold":       { "hex": "#b48a3c" },
+    "gold_soft":  { "hex": "#d9b46a" }
+  },
+  "dark": {
+    "paper":      { "hex": "#14130f" },
+    "paper_deep": { "hex": "#2a2722" },
+    "surface":    { "hex": "#0e0d0a" },
+    "ink":        { "hex": "#f0ede4" },
+    "ink_soft":   { "hex": "#bdb8ad" },
+    "muted":      { "hex": "#6a6760" },
+    "line":       { "hex": "#fffdf5", "alpha": 0.08 },
+    "line_firm":  { "hex": "#fffdf5", "alpha": 0.22 },
+    "vermillion": { "hex": "#d35a3e" },
+    "gold":       { "hex": "#d4a652" },
+    "gold_soft":  { "hex": "#e9c476" }
+  },
+  "stones": {
+    "black_outer": { "hex": "#0d0c0a" },
+    "black_inner": { "hex": "#4a4640" },
+    "black_dark_outer": { "hex": "#1a1814" },
+    "black_dark_inner": { "hex": "#9a8f80" },
+    "white_outer": { "hex": "#d8d2c4" },
+    "white_inner": { "hex": "#ffffff" },
+    "white_border": { "hex": "#000000", "alpha": 0.18 }
+  }
+}
