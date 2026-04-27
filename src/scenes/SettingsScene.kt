@@ -1,6 +1,8 @@
 package scenes
 
+import korlibs.event.*
 import korlibs.image.text.*
+import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.view.*
 import logic.*
@@ -14,6 +16,10 @@ class SettingsScene : Scene() {
         val h = Viewport.H.toDouble()
 
         solidRect(w, h, theme.paper)
+
+        keys.down {
+            if (it.key == Key.BACK || it.key == Key.ESCAPE) Nav.goMenu()
+        }
 
         kinTextButton("← Назад", color = theme.muted) { Nav.goMenu() }
             .apply {
@@ -106,7 +112,7 @@ class SettingsScene : Scene() {
         // Footer
         val footerY = h - 36.0
         solidRect(w - 48.0, 1.0, theme.line) { position(24.0, footerY - 12.0) }
-        text("ВЕРСИЯ 1.0.4", 11.0, theme.muted, font = Fonts.uiMedium) {
+        text("ВЕРСИЯ ${AppVersion.VERSION}", 11.0, theme.muted, font = Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(24.0, footerY)
         }

@@ -36,3 +36,10 @@ dependencies {
     //add("commonMainApi", project(":korge-dragonbones"))
 }
 
+// Android Release lint tasks конфликтуют с KorGE multiplatform.
+afterEvaluate {
+    tasks.findByName("lintVitalAnalyzeRelease")?.enabled = false
+    tasks.findByName("lintVitalReportRelease")?.enabled = false
+    tasks.findByName("lintVitalRelease")?.enabled = false
+}
+

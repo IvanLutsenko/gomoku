@@ -1,6 +1,8 @@
 package scenes
 
+import korlibs.event.*
 import korlibs.image.text.*
+import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.service.vibration.*
 import korlibs.korge.view.*
@@ -25,6 +27,10 @@ class GameScene : Scene() {
         val ai: AiPlayer = AiFactory.create(SettingsStore.current.aiDifficulty)
 
         solidRect(w, h, theme.paper)
+
+        keys.down {
+            if (it.key == Key.BACK || it.key == Key.ESCAPE) Nav.goMenu()
+        }
 
         // ── Top bar ─────────────────────────────────────────────────────
         text("五目", Type.subtitle.size, theme.ink, font = Fonts.serifJp) {

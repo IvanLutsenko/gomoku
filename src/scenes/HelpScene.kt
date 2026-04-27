@@ -1,6 +1,8 @@
 package scenes
 
+import korlibs.event.*
 import korlibs.image.text.*
+import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.view.*
 import ui.*
@@ -22,6 +24,10 @@ class HelpScene : Scene() {
         val h = Viewport.H.toDouble()
 
         solidRect(w, h, theme.paper)
+
+        keys.down {
+            if (it.key == Key.BACK || it.key == Key.ESCAPE) Nav.goMenu()
+        }
 
         kinTextButton("← Назад", color = theme.muted) { Nav.goMenu() }
             .apply {

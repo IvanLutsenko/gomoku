@@ -1,6 +1,8 @@
 package scenes
 
+import korlibs.event.*
 import korlibs.image.text.*
+import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.view.*
 import ui.*
@@ -13,6 +15,11 @@ class MenuScene : Scene() {
         val centerX = w / 2.0
 
         solidRect(w, h, theme.paper)
+
+        // Android Back / desktop ESC из главного меню — закрытие приложения.
+        keys.down {
+            if (it.key == Key.BACK || it.key == Key.ESCAPE) gameWindow.close()
+        }
 
         // Theme toggle (top-right)
         kinIconRound(
