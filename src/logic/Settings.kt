@@ -7,12 +7,19 @@ import kotlinx.serialization.json.*
 import logic.ai.Difficulty
 import kotlin.coroutines.EmptyCoroutineContext
 
+// Цвет игрока в AI-режиме. ALTERNATE — чередование между партиями.
+@Serializable
+enum class PlayerColorPref { ALTERNATE, WHITE, BLACK }
+
 @Serializable
 data class Settings(
     val dark: Boolean = false,
     val aiDifficulty: Difficulty = Difficulty.MID,
     val hints: Boolean = false,
     val sound: Boolean = true,
+    val music: Boolean = true,
+    val confirmMoves: Boolean = false,
+    val playerColor: PlayerColorPref = PlayerColorPref.ALTERNATE,
     val firstRun: Boolean = true,
 )
 

@@ -34,14 +34,32 @@ enum class GameMode { PVP, AI }
 
 // Глобальное состояние игры — переживает переключения сцен и темы.
 object GameSession {
+    const val HINTS_PER_GAME = 3
+
     var game: GameLogic = GameLogic()
         private set
     var mode: GameMode = GameMode.PVP
         private set
 
+    // Цвет человека в AI-режиме. Начальное WHITE, чтобы первый ALTERNATE-флип
+    // дал чёрных (первый ход) в первой партии.
+    var humanColor: StoneColor = StoneColor.WHITE
+        private set
+
+    // Остаток подсказок на текущую партию (подсказки по запросу).
+    var hintsLeft: Int = HINTS_PER_GAME
+
     fun newGame(mode: GameMode) {
         game = GameLogic()
         this.mode = mode
+        hintsLeft = HINTS_PER_GAME
+        if (mode == GameMode.AI) {
+            humanColor = when (SettingsStore.current.playerColor) {
+                PlayerColorPref.BLACK -> StoneColor.BLACK
+                PlayerColorPref.WHITE -> StoneColor.WHITE
+                PlayerColorPref.ALTERNATE -> humanColor.opposite
+            }
+        }
     }
 }
 
@@ -69,15 +87,6 @@ object Nav {
 
     fun goSettings() = launch { container.changeTo(time = FADE, transition = crossfade) { SettingsScene() } }
     fun goHelp() = launch { container.changeTo(time = FADE, transition = crossfade) { HelpScene() } }
-
-    // winner == null → ничья.
-    fun goVictory(winner: StoneColor?) = launch {
-        currentVictoryWinner = winner
-        container.changeTo(time = FADE, transition = crossfade) { VictoryScene() }
-    }
-
-    var currentVictoryWinner: StoneColor? = StoneColor.BLACK
-        private set
 
     private fun launch(block: suspend () -> Unit) {
         container.launchImmediately { block() }

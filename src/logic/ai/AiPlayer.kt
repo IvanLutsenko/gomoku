@@ -22,7 +22,7 @@ object AiFactory {
     fun create(d: Difficulty): AiPlayer = when (d) {
         Difficulty.EASY -> RandomNearAi()
         Difficulty.MID  -> HeuristicAi(neighborhood = 1, opponentBias = 0.9)
-        Difficulty.HARD -> HeuristicAi(neighborhood = 2, opponentBias = 1.0)
+        Difficulty.HARD -> HeuristicAi(neighborhood = 2, opponentBias = 1.0, depth = 2)
     }
 }
 
@@ -38,13 +38,12 @@ private class RandomNearAi : AiPlayer {
     }
 }
 
-// ── Single-ply эвристика с оценкой угроз. Достаточно сильна чтобы
-// блокировать четвёрки и тройки, и сама строит атаки. Не считает
-// «двойную тройку» по-настоящему но в большинстве позиций играет
-// по-человечески разумно.
+// ── Эвристика угроз на скользящих окнах (видит разрывные паттерны XX_XX)
+// + опциональный 2-ply поиск: мой ход → лучший ответ соперника.
 class HeuristicAi(
     private val neighborhood: Int = 1,
     private val opponentBias: Double = 0.9,
+    private val depth: Int = 1,
 ) : AiPlayer {
 
     override fun chooseMove(game: GameLogic): Position {
@@ -54,25 +53,44 @@ class HeuristicAi(
 
         if (board.moveCount == 0) return Position(7, 7)
 
-        // Случайный tie-break среди равных по очкам: иначе партии детерминированы
-        // и заучиваются (первый кандидат в порядке итерации всегда побеждает).
         val candidates = candidateCells(board, radius = neighborhood)
-        val bests = mutableListOf<Position>()
-        var bestScore = Long.MIN_VALUE
+        val scored = candidates
+            .map { it to scoreMove(board, it.row, it.col, me, opp, opponentBias) }
+            .sortedByDescending { it.second }
 
-        for (pos in candidates) {
-            val s = scoreMove(board, pos.row, pos.col, me, opp, opponentBias)
-            if (s > bestScore) {
-                bestScore = s
-                bests.clear()
-                bests += pos
-            } else if (s == bestScore) {
-                bests += pos
-            }
+        // Немедленный выигрыш/блок выигрыша: 2-ply не нужен.
+        if (depth < 2 || scored.first().second >= WIN_SCORE) {
+            return pickBest(scored)
         }
-        return bests.random(Random.Default)
+
+        // 2-ply: по топ-10 кандидатам симулируем свой ход и оцениваем лучший
+        // ответ соперника (топ-8 его кандидатов). Полного минимакса нет —
+        // на 15×15 этого хватает, чтобы не отдавать двухходовые ловушки.
+        // ponytail: мутируем реальный Board через place/undo — UI на время
+        // chooseMove заблокирован (aiThinking), гонок нет.
+        val results = mutableListOf<Pair<Position, Long>>()
+        for ((pos, myScore) in scored.take(10)) {
+            if (!board.placeStone(pos.row, pos.col, me)) continue
+            val oppBest = candidateCells(board, radius = 1)
+                .map { scoreMove(board, it.row, it.col, opp, me, opponentBias) }
+                .sortedDescending()
+                .take(8)
+                .maxOrNull() ?: 0L
+            board.undoLastMove()
+            results += pos to (myScore - (oppBest * 0.9).toLong())
+        }
+        return pickBest(results.sortedByDescending { it.second })
+    }
+
+    // Случайный tie-break среди равных по очкам: иначе партии детерминированы
+    // и заучиваются.
+    private fun pickBest(sorted: List<Pair<Position, Long>>): Position {
+        val top = sorted.first().second
+        return sorted.takeWhile { it.second == top }.random(Random.Default).first
     }
 }
+
+const val WIN_SCORE = 10_000_000L
 
 // Считает очки гипотетического хода в (r,c) с точки зрения цвета `me`.
 // Возвращает большие значения за создание собственных угроз и блокировку
@@ -86,11 +104,11 @@ fun scoreMove(
     var attack = 0L
     var defense = 0L
     for ((dr, dc) in dirs) {
-        attack += evalLine(board, r, c, dr, dc, me, hypothetical = true)
-        defense += evalLine(board, r, c, dr, dc, opp, hypothetical = false)
+        attack += evalWindows(board, r, c, dr, dc, me)
+        defense += evalWindows(board, r, c, dr, dc, opp)
     }
     val centerBonus = (7 - max(abs(r - 7), abs(c - 7))).toLong()
-    // attack и defense уже сопоставимы по масштабу (evalLine возвращает
+    // attack и defense уже сопоставимы по масштабу (evalWindows возвращает
     // одни и те же диапазоны для обеих сторон). opponentBias < 1 чтобы
     // при равном выборе предпочитать собственную атаку защите.
     return attack + (defense * opponentBias).toLong() + centerBonus
@@ -116,45 +134,40 @@ fun candidateCells(board: Board, radius: Int = 2): List<Position> {
     return out.toList()
 }
 
-// Оценка фрагмента линии вдоль (dr,dc) при условии, что в (r,c) стоит
-// `color` (для атаки) или там ставится оппонент чтобы блок (для защиты —
-// в том же месте). Учитываем длину и количество открытых концов.
-private fun evalLine(
+// Оценка вдоль (dr,dc) скользящими окнами длины 5, при условии что в (r,c)
+// стоит камень `color` (гипотетически). Окно засчитывается, только если в нём
+// нет камней противника — поэтому разрывные паттерны (XX_XX, X_XXX, _XX_X_)
+// оцениваются естественно: чем больше своих камней в «живом» окне, тем дороже.
+// Открытые фигуры автоматически дороже закрытых — они попадают в больше окон.
+private fun evalWindows(
     board: Board, r: Int, c: Int, dr: Int, dc: Int, color: StoneColor,
-    hypothetical: Boolean,
 ): Long {
-    var count = if (hypothetical) 1 else 0  // hypothetical: представляем камень `color` в (r,c)
-    var openEnds = 0
-
-    // Если не гипотетически — считаем угрозу, как если бы оппонент уже сходил
-    // в (r,c). Это даёт correct «defense» — наш ход в (r,c) убивает всю эту
-    // потенциальную угрозу.
-    if (!hypothetical) count = 1
-
-    var nr = r + dr; var nc = c + dc
-    while (board.isValidPosition(nr, nc) && board.getStone(nr, nc) == color) {
-        count++; nr += dr; nc += dc
+    var total = 0L
+    for (offset in -4..0) {
+        var mine = 0
+        var blocked = false
+        for (k in 0..4) {
+            val rr = r + (offset + k) * dr
+            val cc = c + (offset + k) * dc
+            if (!board.isValidPosition(rr, cc)) { blocked = true; break }
+            val s = if (rr == r && cc == c) color else board.getStone(rr, cc)
+            when (s) {
+                color -> mine++
+                null -> {}
+                else -> { blocked = true }
+            }
+            if (blocked) break
+        }
+        if (blocked) continue
+        total += when (mine) {
+            5 -> WIN_SCORE       // пять в окне (включая «через дырку» — ход в разрыв)
+            4 -> 120_000L        // четвёрка: ход достраивает до пяти
+            3 -> 5_000L
+            2 -> 200L
+            else -> 5L           // одиночный камень в живом окне
+        }
     }
-    if (board.isValidPosition(nr, nc) && board.isEmpty(nr, nc)) openEnds++
-
-    nr = r - dr; nc = c - dc
-    while (board.isValidPosition(nr, nc) && board.getStone(nr, nc) == color) {
-        count++; nr -= dr; nc -= dc
-    }
-    if (board.isValidPosition(nr, nc) && board.isEmpty(nr, nc)) openEnds++
-
-    return when {
-        count >= 5 -> 10_000_000L      // выигрыш
-        count == 4 && openEnds == 2 -> 1_000_000L  // open four
-        count == 4 && openEnds == 1 -> 100_000L    // closed four
-        count == 3 && openEnds == 2 -> 50_000L     // open three
-        count == 3 && openEnds == 1 -> 1_000L
-        count == 2 && openEnds == 2 -> 500L
-        count == 2 && openEnds == 1 -> 50L
-        count == 1 && openEnds == 2 -> 10L
-        count == 1 && openEnds == 1 -> 1L
-        else -> 0L
-    }
+    return total
 }
 
 // ── Утилиты для подсказок (используются GameScene'ом) ────────────────────

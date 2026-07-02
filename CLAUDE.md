@@ -28,14 +28,14 @@ export JAVA_HOME=/Users/lutse/Library/Java/JavaVirtualMachines/jbrsdk_jcef-21.0.
 KorGE-плагин маппит исходники прямо из корня репозитория, **без** `src/main/kotlin` или `src/commonMain/kotlin`:
 
 - `src/main.kt` — точка входа (`suspend fun main() = Korge { ... }`), монтирует `sceneContainer` и `Nav`. Грузит `Fonts` и `SettingsStore`, стартует сразу в `MenuScene`.
-- `src/scenes/` — экраны (`MenuScene`, `GameScene`, `SettingsScene`, `HelpScene`, `VictoryScene`) + `Nav` (роутинг) + `GameSession` (текущая партия).
+- `src/scenes/` — экраны (`MenuScene`, `GameScene`, `SettingsScene`, `HelpScene`) + `Nav` (роутинг) + `GameSession` (текущая партия, цвет игрока, лимит подсказок). Экрана победы нет — финал показывается оверлеем в `GameScene`.
 - `src/ui/` — дизайн-система Kintsugi: `Theme.kt` (палитры/типы/spacing, читает `dark` из `SettingsStore`), `KinSeam.kt` (золотая жила), `Stone.kt`, `Enso.kt`, `Widgets.kt` (кнопки/тогглы/сегменты + `kinText` DPI-резкий текст + `kinPaperBackground`), `KinBoard.kt` (доска со слоем подсказок), `Strings.kt` (**все пользовательские строки** — object `Str`, задел под локализацию; новые UI-тексты добавляй только туда).
 - `src/logic/` — пакет `logic`. `GameLogic.kt` (правила), `Settings.kt` (`Settings` + `SettingsStore` с JSON-персистом в `applicationDataVfs`).
 - `src/logic/ai/AiPlayer.kt` — `Difficulty` enum, `AiFactory`, `RandomNearAi`, `HeuristicAi` (single-ply scoring threats). `topMoves(...)` для подсказок.
 - `src/model/` — пакет `model` (модель данных).
 - `test/` — тесты (пакет `test` для скриптовых, корневой пакет для `ViewsForTesting`).
 - `resources/fonts/` — Noto Serif, Noto Serif JP, Inter (TTF, бандлятся в сборку).
-- `resources/sounds/stone.wav` — синтезированный клик камня (играется на каждый ход, гейт — `Settings.sound`).
+- `resources/sounds/` — синтезированные `stone.wav` (клик камня, гейт `Settings.sound`) и `ambient.wav` (фоновый эмбиент-луп, `MusicPlayer` в `ui/Music.kt`, гейт `Settings.music`).
 - `docs/design/` — токены и спецификация дизайна (DESIGN_SYSTEM.md, SCREENS.md, VEINS.md, tokens/*.json) — источник истины.
 
 Файлы вида `src/main_backup.kt.backup`, `null.frame`, `null.socket` — мусор от старых запусков, игнорируй. `.gitignore` явно исключает `src/main/*` (то есть стандартную раскладку).
@@ -45,14 +45,15 @@ KorGE-плагин маппит исходники прямо из корня р
 ```
 main.kt → MenuScene
             ├→ GameScene (через Nav.goGame; GameSession хранит GameLogic)
-            │     ├→ VictoryScene (через Nav.goVictory после победы)
+            │     ├→ victory-оверлей поверх доски (не отдельная сцена;
+            │     │   «Посмотреть доску» прячет его, партию можно отмотать)
             │     └→ MenuScene
             ├→ SettingsScene
             └→ HelpScene
 ```
 
-- **`scenes/Nav.kt`** — singleton с ссылкой на `SceneContainer`. Все навигационные функции синхронные (`Nav.goMenu()` и т.п.); внутри `launchImmediately` запускает `sceneContainer.changeTo<MyScene>()`. Также держит `currentVictoryWinner` для передачи в `VictoryScene`.
-- **`scenes/GameSession.kt`** (в Nav.kt) — синглтон с текущим `GameLogic` и `GameMode`. Переживает переключения сцен и темы, чтобы `Theme.toggle() + Nav.goGameKeepState()` не сбрасывал партию.
+- **`scenes/Nav.kt`** — singleton с ссылкой на `SceneContainer`. Все навигационные функции синхронные (`Nav.goMenu()` и т.п.); внутри `launchImmediately` запускает `sceneContainer.changeTo<MyScene>()`.
+- **`GameSession`** (в Nav.kt) — синглтон с текущим `GameLogic`, `GameMode`, `humanColor` (настройка «цвет игрока»: чередование/белые/чёрные, чередование считается при `newGame`) и `hintsLeft` (лимит подсказок на партию). Переживает переключения сцен и темы, чтобы `Theme.toggle() + Nav.goGameKeepState()` не сбрасывал партию.
 - **`ui/Theme.kt`** — `Theme` singleton с `dark: Boolean` и `colors: KinPalette`. `Theme.toggle()` уведомляет подписчиков, но в этой реализации каждое переключение сцены просто читает `Theme.colors` свежим. Шрифты в `Fonts` объекте — `loadOnce()` в `main.kt` при старте.
 - **`ui/KinSeam.kt`** — золотая жила: Catmull-Rom через jitter-точки → polyline → 3 слоя (underglow/main/highlight) + опциональные branches и pool. Порт `kin_seam.gd` из `docs/design/godot/kin_seam.gd`. Используется как декоративный элемент бренда и линия победы.
 - **`ui/KinBoard.kt`** — `KinBoardView : Container`. 15×15 grid + хоси + слой камней (rebuilt on `redraw()`) + слой win-seam. 225 невидимых hit-target клеток. `var onCellClickHandler` чтобы навешивать обработчик после конструирования (нужно из-за circular deps в GameScene).
@@ -95,9 +96,9 @@ export JAVA_HOME=/Users/lutse/Library/Java/JavaVirtualMachines/jbrsdk_jcef-21.0.
 
 ## AI и подсказки
 
-`logic/ai/AiPlayer.kt` — single-ply heuristic, оценивает каждую кандидат-клетку как сумму атакующего score (создаёт собственные тройки/четвёрки) и защитного score (блокирует чужие). `Difficulty.EASY` — `RandomNearAi` (случайная клетка в радиусе 2 от занятых). `MID` — heuristic с радиусом 1 и opponentBias 0.9. `HARD` — радиус 2, bias 1.0 (увеличивает кругозор). Полноценный minimax не делал — single-ply на этих весах достаточно сильно играет (блокирует все стандартные угрозы и строит свои). Подсказки (`topMoves`) используют ту же эвристику.
+`logic/ai/AiPlayer.kt` — оценка ходов скользящими окнами длины 5 (`evalWindows`): окно засчитывается стороне, только если в нём нет чужих камней, поэтому разрывные паттерны (`XX_XX`, `X_XXX`) оцениваются естественно. `scoreMove` = атака + защита×bias + центр-бонус. `Difficulty.EASY` — `RandomNearAi` (случайная клетка в радиусе 2 от занятых). `MID` — окна с радиусом 1 и opponentBias 0.9. `HARD` — радиус 2, bias 1.0, **depth 2**: по топ-10 кандидатам симулируется свой ход (place/undo на реальном Board — безопасно, UI заблокирован на время `chooseMove`) и вычитается лучший ответ соперника. Tie-break случайный. Подсказки (`topMoves`) — single-ply та же оценка; в игре они по запросу: кнопка «Подсказка · N», `GameSession.hintsLeft` (3 на партию), подсветка живёт до следующего redraw.
 
-В `GameScene` пользователь — BLACK, AI — WHITE. После хода игрока в AI-режиме планируется `aiTurn()` через `launch { delay(450); ... }`. Пока AI «думает», `aiThinking` блокирует клики (через `isHumanTurn()`) **и кнопку Undo** (`busy` в `renderControls`) — иначе undo мутировал бы `Board`, который `chooseMove` читает на `Dispatchers.Default`. После `chooseMove` состояние перепроверяется перед применением хода. Undo в AI-режиме откатывает 2 хода (свой + AI), чтобы вернуть очередь игроку; undo доступен и после победы — `undoMove` возвращает партию в PLAYING.
+В `GameScene` цвет человека — `GameSession.humanColor` (настройка: чередование/белые/чёрные; при «чередовать» флип на каждом `newGame` AI-режима). После хода игрока в AI-режиме планируется `aiTurn()` через `launch { delay(450); ... }`. Пока AI «думает», `aiThinking` блокирует клики (через `isHumanTurn()`) **и кнопку Undo** (`busy` в `renderControls`) — иначе undo мутировал бы `Board`, который `chooseMove` читает на `Dispatchers.Default`. После `chooseMove` состояние перепроверяется перед применением хода. Undo в AI-режиме откатывает 2 хода (свой + AI), чтобы вернуть очередь игроку; undo доступен и после победы — `undoMove` возвращает партию в PLAYING. Опция `confirmMoves` — ход в два тапа через ghost-камень (`KinBoardView.showGhost`).
 
 ## Settings persistence
 

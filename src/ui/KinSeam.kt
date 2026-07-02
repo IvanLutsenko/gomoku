@@ -89,9 +89,13 @@ fun Container.kinSeam(
     segments: Int = 8,
     color: RGBA = Theme.colors.gold,
     colorSoft: RGBA = Theme.colors.goldSoft,
+    // 0..1 — какая часть жилы уже «проросла» (анимация победной линии).
+    progress: Double = 1.0,
 ): Container = container {
     val pts = buildPoints(Point(x1, y1), Point(x2, y2), jitter, segments, seed)
-    val line = samplePolyline(pts, 8)
+    val full = samplePolyline(pts, 8)
+    val line = if (progress >= 1.0) full
+    else full.take(((full.size * progress).toInt()).coerceAtLeast(2))
 
     val main = color.scaleAlpha(opacity)
     val soft = colorSoft.scaleAlpha(opacity)
@@ -125,7 +129,7 @@ fun Container.kinSeam(
             ),
         ) { polyline(line) }
 
-        if (branches && pts.size >= 5) {
+        if (branches && pts.size >= 5 && progress >= 1.0) {
             val rng = KinRng(seed + 7)
 
             val bp1 = pts[2]

@@ -13,6 +13,7 @@ suspend fun main() = Korge(
 ) {
     Fonts.loadOnce()
     SettingsStore.load()
+    MusicPlayer.init(views.coroutineContext)
 
     // Live source of native width — surface size becomes known only after
     // first frame on Android, поэтому читаем лениво при каждом kinText().

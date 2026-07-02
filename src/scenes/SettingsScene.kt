@@ -46,7 +46,7 @@ class SettingsScene : Scene() {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
-        y += 32.0
+        y += 28.0
 
         // Тема
         kinFieldLabel(Str.SETTINGS_THEME, theme).apply {
@@ -67,7 +67,7 @@ class SettingsScene : Scene() {
                 }
             },
         ).position(24.0, y)
-        y += 42.0 + 28.0
+        y += 42.0 + 18.0
 
         // Сложность AI
         kinFieldLabel(Str.SETTINGS_DIFFICULTY, theme).apply {
@@ -85,7 +85,25 @@ class SettingsScene : Scene() {
                 SettingsStore.update { it.copy(aiDifficulty = diffs[idx]) }
             },
         ).position(24.0, y)
-        y += 42.0 + 28.0
+        y += 42.0 + 18.0
+
+        // Цвет игрока в AI-режиме (чередование по умолчанию)
+        kinFieldLabel(Str.SETTINGS_PLAYER_COLOR, theme).apply {
+            alignment = TextAlignment.TOP_LEFT
+            position(24.0, y)
+        }
+        y += 22.0
+        val colorPrefs = listOf(PlayerColorPref.ALTERNATE, PlayerColorPref.WHITE, PlayerColorPref.BLACK)
+        kinSegmented(
+            items = listOf(Str.COLOR_ALTERNATE, Str.COLOR_WHITE, Str.COLOR_BLACK),
+            initialIndex = colorPrefs.indexOf(SettingsStore.current.playerColor).coerceAtLeast(0),
+            totalWidth = w - 48.0,
+            theme = theme,
+            onChange = { idx ->
+                SettingsStore.update { it.copy(playerColor = colorPrefs[idx]) }
+            },
+        ).position(24.0, y)
+        y += 42.0 + 18.0
 
         // Помощники
         kinFieldLabel(Str.SETTINGS_HELPERS, theme).apply {
@@ -98,14 +116,29 @@ class SettingsScene : Scene() {
             this, w, y, Str.SETTINGS_HINTS, SettingsStore.current.hints, theme,
             onChange = { v -> SettingsStore.update { it.copy(hints = v) } },
         )
-        y += 48.0
+        y += 44.0
+
+        renderToggleRow(
+            this, w, y, Str.SETTINGS_CONFIRM, SettingsStore.current.confirmMoves, theme,
+            onChange = { v -> SettingsStore.update { it.copy(confirmMoves = v) } },
+        )
+        y += 44.0
 
         renderToggleRow(
             this, w, y, Str.SETTINGS_SOUND, SettingsStore.current.sound, theme,
-            last = true,
             onChange = { v -> SettingsStore.update { it.copy(sound = v) } },
         )
-        y += 48.0
+        y += 44.0
+
+        renderToggleRow(
+            this, w, y, Str.SETTINGS_MUSIC, SettingsStore.current.music, theme,
+            last = true,
+            onChange = { v ->
+                SettingsStore.update { it.copy(music = v) }
+                MusicPlayer.sync()
+            },
+        )
+        y += 44.0
 
         // Footer
         val footerY = h - 36.0
@@ -129,12 +162,12 @@ class SettingsScene : Scene() {
     ) {
         host.kinText(label, Type.body, theme.ink) {
             alignment = TextAlignment.MIDDLE_LEFT
-            position(24.0, y + 24.0)
+            position(24.0, y + 22.0)
         }
         host.kinToggle(initial, theme = theme, onChange = onChange)
-            .position(w - 24.0 - 44.0, y + 12.0)
+            .position(w - 24.0 - 44.0, y + 10.0)
         if (!last) {
-            host.solidRect(w - 48.0, 1.0, theme.line) { position(24.0, y + 47.0) }
+            host.solidRect(w - 48.0, 1.0, theme.line) { position(24.0, y + 43.0) }
         }
     }
 }

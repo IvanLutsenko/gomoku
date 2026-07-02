@@ -31,6 +31,7 @@ object Str {
     const val DRAW = "Ничья"
     const val GAME_UNDO = "← Отменить"
     const val GAME_NEW = "Новая партия"
+    const val GAME_HINT = "Подсказка"
 
     // Настройки
     const val BACK = "← Назад"
@@ -40,9 +41,15 @@ object Str {
     const val THEME_LIGHT = "☀  Свет"
     const val THEME_DARK = "☾  Тьма"
     const val SETTINGS_DIFFICULTY = "Сложность AI"
+    const val SETTINGS_PLAYER_COLOR = "Цвет игрока (vs AI)"
+    const val COLOR_ALTERNATE = "Чередовать"
+    const val COLOR_WHITE = "Белые"
+    const val COLOR_BLACK = "Чёрные"
     const val SETTINGS_HELPERS = "Помощники"
     const val SETTINGS_HINTS = "Подсказки ходов"
+    const val SETTINGS_CONFIRM = "Подтверждение хода"
     const val SETTINGS_SOUND = "Звуки и вибрация"
+    const val SETTINGS_MUSIC = "Музыка"
     const val SETTINGS_VERSION_PREFIX = "ВЕРСИЯ "
     const val SETTINGS_ONLINE = "ОНЛАЙН"
 
@@ -54,6 +61,7 @@ object Str {
     const val VICTORY_META = "ПАРТИЯ ЗАВЕРШЕНА"
     const val VICTORY_AGAIN = "Ещё партию"
     const val VICTORY_TO_MENU = "В меню"
+    const val VICTORY_VIEW_BOARD = "Посмотреть доску"
 
     // Сложность AI
     const val DIFFICULTY_EASY = "Легко"

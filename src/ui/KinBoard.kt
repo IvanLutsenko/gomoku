@@ -3,8 +3,11 @@ package ui
 import korlibs.image.color.*
 import korlibs.korge.input.*
 import korlibs.korge.view.*
+import korlibs.io.lang.*
+import korlibs.time.*
 import logic.*
 import model.*
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 class KinBoardView(
@@ -22,6 +25,12 @@ class KinBoardView(
     private val stonesLayer: Container
     private val seamLayer: Container
     private val hintsLayer: Container
+    private val ghostLayer: Container
+
+    // Анимации: камень появляется только на новом ходе, жила «прорастает».
+    private var lastAnimatedMoveCount = -1
+    private var seamUpdater: Cancellable? = null
+    private var seamAnimated = false
 
     init {
         // Фон
@@ -39,6 +48,7 @@ class KinBoardView(
         stonesLayer = container { }
         seamLayer = container { }
         hintsLayer = container { }
+        ghostLayer = container { }
 
         // Один большой hit-area поверх всех слоёв. На клик вычисляем
         // ближайшее пересечение — точное попадание не нужно, палец просто
@@ -79,37 +89,102 @@ class KinBoardView(
 
     fun redraw() {
         stonesLayer.removeChildren()
+        seamUpdater?.cancel()
+        seamUpdater = null
         seamLayer.removeChildren()
+        ghostLayer.removeChildren()
 
         val board = game.getBoard()
         val lastMove = game.getMoveHistory().lastOrNull()
         val winPositions = game.winningLine?.positions
+        val moveCount = game.getMoveCount()
+        val animateLast = moveCount == lastAnimatedMoveCount + 1
+        lastAnimatedMoveCount = moveCount
 
         for (r in 0 until BoardSpec.SIZE_CELLS) {
             for (c in 0 until BoardSpec.SIZE_CELLS) {
                 val stone = board.getStone(r, c) ?: continue
                 val isLast = lastMove?.let { it.row == r && it.col == c } == true
                 val isWin = winPositions?.any { it.row == r && it.col == c } == true
-                stonesLayer.kinStone(
+                val view = stonesLayer.kinStone(
                     isBlack = stone == StoneColor.BLACK,
                     radius = cell * BoardSpec.STONE_RADIUS_RATIO,
                     isLast = isLast,
                     isWin = isWin,
                     theme = theme,
                 ).position(pad + c * cell, pad + r * cell)
+                if (isLast && animateLast) animateAppear(view)
             }
         }
 
         if (winPositions != null && winPositions.size >= 2) {
             val first = winPositions.first()
             val last = winPositions.last()
-            seamLayer.kinSeam(
-                x1 = pad + first.col * cell, y1 = pad + first.row * cell,
-                x2 = pad + last.col * cell, y2 = pad + last.row * cell,
-                jitter = 4.0, seed = 12, width = 2.4,
-                color = theme.gold, colorSoft = theme.goldSoft,
-            )
+            val x1 = pad + first.col * cell
+            val y1 = pad + first.row * cell
+            val x2 = pad + last.col * cell
+            val y2 = pad + last.row * cell
+            fun drawSeam(progress: Double) {
+                seamLayer.removeChildren()
+                seamLayer.kinSeam(
+                    x1 = x1, y1 = y1, x2 = x2, y2 = y2,
+                    jitter = 4.0, seed = 12, width = 2.4,
+                    color = theme.gold, colorSoft = theme.goldSoft,
+                    progress = progress,
+                )
+            }
+            if (seamAnimated) {
+                drawSeam(1.0)
+            } else {
+                // «Прорастание» золотой трещины по выигрышной линии, 600 мс.
+                seamAnimated = true
+                var t = 0.0
+                seamUpdater = addUpdater { dt ->
+                    t = min(1.0, t + dt.milliseconds / 600.0)
+                    drawSeam(t)
+                    if (t >= 1.0) {
+                        seamUpdater?.cancel()
+                        seamUpdater = null
+                    }
+                }
+            }
+        } else {
+            seamAnimated = false
         }
+    }
+
+    // Появление камня: scale 0.7→1.0 с лёгким overshoot за ~120 мс (ease-out-back).
+    private fun animateAppear(view: View) {
+        view.scale(0.7)
+        var t = 0.0
+        var upd: Cancellable? = null
+        upd = view.addUpdater { dt ->
+            t = min(1.0, t + dt.milliseconds / 120.0)
+            val k = t - 1.0
+            val ease = 1.0 + 2.70158 * k * k * k + 1.70158 * k * k
+            view.scale(0.7 + 0.3 * ease)
+            if (t >= 1.0) {
+                view.scale(1.0)
+                upd?.cancel()
+            }
+        }
+    }
+
+    // Ghost stone — полупрозрачное превью хода (режим подтверждения).
+    fun showGhost(r: Int, c: Int, isBlack: Boolean) {
+        ghostLayer.removeChildren()
+        ghostLayer.kinStone(
+            isBlack = isBlack,
+            radius = cell * BoardSpec.STONE_RADIUS_RATIO,
+            theme = theme,
+        ).apply {
+            position(pad + c * cell, pad + r * cell)
+            alpha = 0.45
+        }
+    }
+
+    fun clearGhost() {
+        ghostLayer.removeChildren()
     }
 
     fun showHints(positions: List<Position>) {
