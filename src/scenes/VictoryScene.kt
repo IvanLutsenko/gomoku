@@ -15,24 +15,28 @@ class VictoryScene : Scene() {
         val h = Viewport.H.toDouble()
         val centerX = w / 2.0
 
-        solidRect(w, h, theme.paper)
+        kinPaperBackground(theme)
 
         onBackOrEscape { Nav.goMenu() }
 
-        val winner = Nav.currentVictoryWinner
+        val winner = Nav.currentVictoryWinner // null → ничья
 
         var y = h * 0.18
 
-        // Камень (96 px) с золотыми жилами поверх
+        // Камень (96 px) с золотыми жилами поверх; при ничьей — пара камней.
         container {
             position(centerX, y)
-            // Камень
-            kinStone(
-                isBlack = winner == StoneColor.BLACK,
-                radius = 48.0,
-                isWin = false,
-                theme = theme,
-            )
+            if (winner != null) {
+                kinStone(
+                    isBlack = winner == StoneColor.BLACK,
+                    radius = 48.0,
+                    isWin = false,
+                    theme = theme,
+                )
+            } else {
+                kinStone(isBlack = true, radius = 36.0, theme = theme).position(-22.0, 4.0)
+                kinStone(isBlack = false, radius = 36.0, theme = theme).position(22.0, -4.0)
+            }
             // Главная жила пересекает камень + ответвление
             kinSeam(
                 x1 = -28.0, y1 = 48.0, x2 = 60.0, y2 = -28.0,
@@ -47,14 +51,18 @@ class VictoryScene : Scene() {
         }
         y += 96.0 + 28.0
 
-        kinText("ПАРТИЯ ЗАВЕРШЕНА", Type.meta, theme.muted) {
+        kinText(Str.VICTORY_META, Type.meta, theme.muted) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
         y += 22.0
 
         kinText(
-            if (winner == StoneColor.BLACK) "Чёрные победили" else "Белые победили",
+            when (winner) {
+                StoneColor.BLACK -> Str.BLACK_WINS
+                StoneColor.WHITE -> Str.WHITE_WINS
+                null -> Str.DRAW
+            },
             40.0, theme.ink, Fonts.serif,
         ) {
             alignment = TextAlignment.TOP_CENTER
@@ -83,7 +91,7 @@ class VictoryScene : Scene() {
         val btnX = centerX - btnW / 2.0
 
         kinButton(
-            width = btnW, label = "Ещё партию", primary = true, centered = true,
+            width = btnW, label = Str.VICTORY_AGAIN, primary = true, centered = true,
             theme = theme,
             onPress = {
                 GameSession.newGame(GameSession.mode)
@@ -93,7 +101,7 @@ class VictoryScene : Scene() {
         y += 64.0
 
         kinButton(
-            width = btnW, label = "В меню", centered = true, theme = theme,
+            width = btnW, label = Str.VICTORY_TO_MENU, centered = true, theme = theme,
             onPress = { Nav.goMenu() },
         ).position(btnX, y)
     }

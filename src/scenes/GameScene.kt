@@ -1,7 +1,9 @@
 package scenes
 
+import korlibs.audio.sound.*
 import korlibs.event.*
 import korlibs.image.text.*
+import korlibs.io.file.std.*
 import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.service.vibration.*
@@ -25,19 +27,20 @@ class GameScene : Scene() {
         val game = GameSession.game
         val mode = GameSession.mode
         val ai: AiPlayer = AiFactory.create(SettingsStore.current.aiDifficulty)
+        stoneSound = runCatching { resourcesVfs["sounds/stone.wav"].readSound() }.getOrNull()
 
-        solidRect(w, h, theme.paper)
+        kinPaperBackground(theme)
 
         onBackOrEscape { Nav.goMenu() }
 
         // ── Top bar ─────────────────────────────────────────────────────
-        kinText("五目", Type.subtitle.size, theme.ink, Fonts.serifJp) {
+        kinText(Str.BRAND_IDEOGRAM, Type.subtitle.size, theme.ink, Fonts.serifJp) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, 20.0)
         }
         val modeLabel = if (mode == GameMode.AI)
-            "VS  AI · ${SettingsStore.current.aiDifficulty.label.uppercase()}"
-        else "VS  ИГРОК"
+            Str.GAME_VS_AI_PREFIX + SettingsStore.current.aiDifficulty.label.uppercase()
+        else Str.GAME_VS_HUMAN
         kinText(modeLabel, Type.meta, theme.muted) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, 50.0)
@@ -45,7 +48,7 @@ class GameScene : Scene() {
 
         val menuBtnW = 64.0
         kinButton(
-            width = menuBtnW, label = "МЕНЮ", small = true, centered = true,
+            width = menuBtnW, label = Str.GAME_MENU, small = true, centered = true,
             theme = theme, onPress = { Nav.goMenu() },
         ).position(w - menuBtnW - 24.0, 20.0)
 
@@ -84,7 +87,7 @@ class GameScene : Scene() {
 
         val bottomY = h - 78.0
         val moveCountText = kinText(
-            "ХОД ${game.getMoveCount()}", Type.meta, theme.muted,
+            Str.GAME_MOVE_PREFIX + game.getMoveCount(), Type.meta, theme.muted,
         ).apply {
             alignment = TextAlignment.MIDDLE_LEFT
             position(24.0, bottomY)
@@ -111,11 +114,11 @@ class GameScene : Scene() {
         renderUi = {
             boardView.redraw()
             renderTurnIndicator(turnIndicator, theme, aiThinking)
-            moveCountText.text = "ХОД ${game.getMoveCount()}"
+            moveCountText.text = Str.GAME_MOVE_PREFIX + game.getMoveCount()
             renderHistoryDots(historyContainer, theme)
             renderHints(boardView, isHumanTurn() && SettingsStore.current.hints)
             renderControls(
-                controlsContainer, theme, btnY, btnW, game,
+                controlsContainer, theme, btnY, btnW, game, busy = aiThinking,
                 onUndo = { undoAndRefresh() }, onNew = { newGame() },
             )
         }
@@ -124,11 +127,12 @@ class GameScene : Scene() {
             val res = game.makeMove(r, c)
             if (res !is MoveResult.Success) return@lam false
             triggerHaptic(strong = res.winner != null)
+            playStoneSound()
             renderUi()
-            if (res.gameState != GameState.PLAYING && res.winner != null) {
+            if (res.gameState != GameState.PLAYING) {
                 launch {
                     delay(1200) // как в дизайне: дать победной жиле «прозвучать»
-                    Nav.goVictory(res.winner!!)
+                    Nav.goVictory(res.winner) // null → ничья
                 }
             }
             true
@@ -141,6 +145,12 @@ class GameScene : Scene() {
             delay(450)
             val pos = withContext(Dispatchers.Default) { ai.chooseMove(game) }
             aiThinking = false
+            // Пока AI «думал», партию могли сбросить/откатить (кнопки блокируются
+            // через busy, но новая партия пересоздаёт сцену, а корутина живёт) —
+            // перепроверяем, что ход всё ещё за AI.
+            if (game !== GameSession.game || game.gameState != GameState.PLAYING ||
+                game.currentPlayer != aiColor
+            ) return
             applyMoveRef(pos.row, pos.col)
         }
 
@@ -175,6 +185,12 @@ class GameScene : Scene() {
     }
 
     private val vibration by lazy { NativeVibration(coroutineContext) }
+    private var stoneSound: Sound? = null
+
+    private fun playStoneSound() {
+        if (!SettingsStore.current.sound) return
+        stoneSound?.let { launch { it.play() } }
+    }
 
     private fun triggerHaptic(strong: Boolean = false) {
         if (!SettingsStore.current.sound) return
@@ -192,14 +208,14 @@ class GameScene : Scene() {
         host.removeChildren()
         val game = GameSession.game
         val (label, color) = when {
-            aiThinking -> "AI думает…" to game.currentPlayer
+            aiThinking -> Str.GAME_AI_THINKING to game.currentPlayer
             game.gameState == GameState.PLAYING -> when (game.currentPlayer) {
-                StoneColor.BLACK -> "Ход чёрных" to StoneColor.BLACK
-                StoneColor.WHITE -> "Ход белых" to StoneColor.WHITE
+                StoneColor.BLACK -> Str.TURN_BLACK to StoneColor.BLACK
+                StoneColor.WHITE -> Str.TURN_WHITE to StoneColor.WHITE
             }
-            game.gameState == GameState.BLACK_WINS -> "Чёрные победили" to StoneColor.BLACK
-            game.gameState == GameState.WHITE_WINS -> "Белые победили" to StoneColor.WHITE
-            else -> "Ничья" to StoneColor.BLACK
+            game.gameState == GameState.BLACK_WINS -> Str.BLACK_WINS to StoneColor.BLACK
+            game.gameState == GameState.WHITE_WINS -> Str.WHITE_WINS to StoneColor.WHITE
+            else -> Str.DRAW to StoneColor.BLACK
         }
         val isBlack = color == StoneColor.BLACK
         val gameOver = game.gameState != GameState.PLAYING
@@ -255,19 +271,21 @@ class GameScene : Scene() {
 
     private fun renderControls(
         host: Container, theme: KinPalette, btnY: Double, btnW: Double,
-        game: GameLogic,
+        game: GameLogic, busy: Boolean,
         onUndo: () -> Unit, onNew: () -> Unit,
     ) {
         host.removeChildren()
         host.kinButton(
-            width = btnW, label = "← Отменить", small = true, centered = true, theme = theme,
+            width = btnW, label = Str.GAME_UNDO, small = true, centered = true, theme = theme,
             // Как в дизайне: отмена доступна и после победы — undoMove
             // сбрасывает состояние в PLAYING, партию можно продолжить.
-            enabled = game.getMoveCount() > 0,
+            // busy: undo во время хода AI мутировал бы Board, который
+            // chooseMove читает на Dispatchers.Default (data race).
+            enabled = game.getMoveCount() > 0 && !busy,
             onPress = onUndo,
         ).position(24.0, btnY)
         host.kinButton(
-            width = btnW, label = "Новая партия", primary = true, small = true, centered = true,
+            width = btnW, label = Str.GAME_NEW, primary = true, small = true, centered = true,
             theme = theme,
             onPress = onNew,
         ).position(24.0 + btnW + 10.0, btnY)

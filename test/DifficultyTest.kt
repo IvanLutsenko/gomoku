@@ -1,6 +1,7 @@
 import logic.GameLogic
 import logic.ai.AiFactory
 import logic.ai.Difficulty
+import ui.label
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

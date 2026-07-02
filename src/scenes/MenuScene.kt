@@ -14,7 +14,7 @@ class MenuScene : Scene() {
         val h = Viewport.H.toDouble()
         val centerX = w / 2.0
 
-        solidRect(w, h, theme.paper)
+        kinPaperBackground(theme)
 
         // Android Back из меню: НЕ вызываем preventDefault → KorgwActivity
         // делает super.onBackPressed() и закрывает activity. Желаемое поведение.
@@ -44,21 +44,21 @@ class MenuScene : Scene() {
         y += 96.0 + 8.0
 
         // 五目 — высота glyph-а ≈ Type.display.size, нужен явный gap.
-        kinText("五目", Type.display.size, theme.ink, Fonts.serifJp) {
+        kinText(Str.BRAND_IDEOGRAM, Type.display.size, theme.ink, Fonts.serifJp) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
         y += Type.display.size + 12.0
 
         // G O M O K U (caps tracking)
-        kinText("G  O  M  O  K  U", Type.trackingBrand, theme.muted) {
+        kinText(Str.BRAND_TRACKED, Type.trackingBrand, theme.muted) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
         y += 18.0
 
         // italic подзаголовок
-        kinText("Пять камней в ряд", Type.captionItalic, theme.muted) {
+        kinText(Str.BRAND_TAGLINE, Type.captionItalic, theme.muted) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
@@ -79,14 +79,14 @@ class MenuScene : Scene() {
         val btnX = centerX - btnW / 2.0
 
         kinButton(
-            width = btnW, label = "Игра с AI", primary = true,
+            width = btnW, label = Str.MENU_PLAY_AI, primary = true,
             rightArrow = true, theme = theme,
             onPress = { Nav.goGame(GameMode.AI) },
         ).position(btnX, y)
         y += 52.0 + 12.0
 
         kinButton(
-            width = btnW, label = "Игра вдвоём",
+            width = btnW, label = Str.MENU_PLAY_PVP,
             rightArrow = true, theme = theme, onPress = { Nav.goGame(GameMode.PVP) },
         ).position(btnX, y)
         y += 52.0 + 12.0
@@ -94,15 +94,15 @@ class MenuScene : Scene() {
         // Маленькие кнопки в ряд
         val gap = 12.0
         val smallW = (btnW - gap) / 2.0
-        kinButton(width = smallW, label = "Настройки", small = true, theme = theme, onPress = { Nav.goSettings() })
+        kinButton(width = smallW, label = Str.MENU_SETTINGS, small = true, theme = theme, onPress = { Nav.goSettings() })
             .position(btnX, y)
-        kinButton(width = smallW, label = "Помощь", small = true, theme = theme, onPress = { Nav.goHelp() })
+        kinButton(width = smallW, label = Str.MENU_HELP, small = true, theme = theme, onPress = { Nav.goHelp() })
             .position(btnX + smallW + gap, y)
 
         // Footer
         val footerY = h - 28.0
         circle(3.0, theme.gold) { position(centerX - 88.0, footerY) }
-        kinText("2026 · KORGE EDITION", 11.0, theme.muted, Fonts.uiMedium) {
+        kinText(Str.FOOTER_EDITION, 11.0, theme.muted, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(centerX - 80.0, footerY)
         }

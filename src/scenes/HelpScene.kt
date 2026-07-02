@@ -1,21 +1,12 @@
 package scenes
 
 import korlibs.event.*
+import korlibs.image.font.*
 import korlibs.image.text.*
 import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.view.*
 import ui.*
-
-private data class HelpEntry(val num: String, val title: String, val body: String)
-
-private val HELP_ENTRIES = listOf(
-    HelpEntry("一", "Цель игры", "Выстройте пять камней в ряд по горизонтали, вертикали или диагонали. Чёрные ходят первыми."),
-    HelpEntry("二", "Управление", "Касание — поставить камень. Отменить последний ход можно из нижней панели."),
-    HelpEntry("三", "Стратегия", "Блокируйте открытые тройки соперника и стройте «вилки» — двойные угрозы, которые нельзя закрыть одним ходом."),
-    HelpEntry("四", "Центр", "Первый ход — традиционно тэнгэн, центр доски. Это даёт максимум направлений атаки."),
-    HelpEntry("五", "Кинцуги", "Победная линия выкладывается золотом — как трещины в керамике, которые становятся украшением."),
-)
 
 class HelpScene : Scene() {
     override suspend fun SContainer.sceneMain() {
@@ -23,11 +14,11 @@ class HelpScene : Scene() {
         val w = Viewport.W.toDouble()
         val h = Viewport.H.toDouble()
 
-        solidRect(w, h, theme.paper)
+        kinPaperBackground(theme)
 
         onBackOrEscape { Nav.goMenu() }
 
-        kinTextButton("← Назад", color = theme.muted) { Nav.goMenu() }
+        kinTextButton(Str.BACK, color = theme.muted) { Nav.goMenu() }
             .apply {
                 alignment = TextAlignment.TOP_LEFT
                 position(24.0, 22.0)
@@ -35,7 +26,7 @@ class HelpScene : Scene() {
 
         var y = 56.0
 
-        kinText("Помощь", Type.title, theme.ink) {
+        kinText(Str.HELP_TITLE, Type.title, theme.ink) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
@@ -51,13 +42,13 @@ class HelpScene : Scene() {
         }.position(24.0, y - 4.0)
         y += 16.0
 
-        kinText("ПРАВИЛА И СОВЕТЫ", Type.labelCaps, theme.muted) {
+        kinText(Str.HELP_SECTION, Type.labelCaps, theme.muted) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
         y += 36.0
 
-        for (entry in HELP_ENTRIES) {
+        for (entry in Str.helpEntries) {
             renderEntry(this, y, entry, theme)
             y += entryHeight(entry, theme) + 16.0
         }
@@ -74,9 +65,9 @@ class HelpScene : Scene() {
             alignment = TextAlignment.TOP_LEFT
             position(72.0, y)
         }
-        // Тело — простой word-wrap по словам, ширина 264
+        // Тело — word-wrap по фактическим метрикам шрифта
         val maxW = Viewport.W - 72.0 - 24.0
-        val lines = wrap(entry.body, maxW.toInt(), perCharPx = 7)
+        val lines = wrap(entry.body, maxW, Fonts.ui, 14.0)
         lines.forEachIndexed { i, line ->
             host.kinText(line, 14.0, theme.inkSoft, Fonts.ui) {
                 alignment = TextAlignment.TOP_LEFT
@@ -87,20 +78,19 @@ class HelpScene : Scene() {
 
     private fun entryHeight(entry: HelpEntry, theme: KinPalette): Double {
         val maxW = Viewport.W - 72.0 - 24.0
-        val lines = wrap(entry.body, maxW.toInt(), perCharPx = 7)
+        val lines = wrap(entry.body, maxW, Fonts.ui, 14.0)
         return 26.0 + lines.size * 22.0
     }
 }
 
-// Тривиальный word-wrap: предполагаем фиксированную среднюю ширину символа.
-// Inter 14 ~ 7 px/char для русского текста. Хватает для дизайн-целей.
-private fun wrap(text: String, maxPx: Int, perCharPx: Int): List<String> {
-    val maxChars = maxPx / perCharPx
+// Word-wrap по фактической ширине строки в шрифте (Font.getTextBounds).
+private fun wrap(text: String, maxPx: Double, font: Font, size: Double): List<String> {
+    fun width(s: String): Double = font.getTextBounds(size, s).bounds.width
     val out = mutableListOf<String>()
     var line = StringBuilder()
     for (word in text.split(" ")) {
         val candidate = if (line.isEmpty()) word else "$line $word"
-        if (candidate.length > maxChars && line.isNotEmpty()) {
+        if (width(candidate) > maxPx && line.isNotEmpty()) {
             out += line.toString()
             line = StringBuilder(word)
         } else {

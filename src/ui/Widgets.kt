@@ -1,11 +1,13 @@
 package ui
 
+import korlibs.image.bitmap.*
 import korlibs.image.color.*
 import korlibs.image.font.*
 import korlibs.image.text.*
 import korlibs.korge.input.*
 import korlibs.korge.view.*
 import korlibs.math.geom.*
+import kotlin.math.hypot
 
 // Резкий текст на любом DPI: TTF преобразуется в BitmapFont c physical-pixel
 // размером (size × dpiScale), а Text-view рендерится с logical textSize. Atlas
@@ -54,6 +56,39 @@ fun Container.kinText(
     color: RGBA,
     block: Text.() -> Unit = {},
 ): Text = kinText(label, type.size, color, type.font(), block)
+
+// ───────── Paper background ─────────
+// Бумага + два мягких radial-wash-а (KinScreen из редизайна): свет — две тёмные
+// «тени» по углам, тьма — тёплый блик и золотистое свечение. Битмап кешируется
+// по теме, все сцены используют один.
+private val paperCache = mutableMapOf<Boolean, Bitmap>()
+
+fun Container.kinPaperBackground(theme: KinPalette = Theme.colors) {
+    val w = Viewport.W.toDouble()
+    val h = Viewport.H.toDouble()
+    solidRect(w, h, theme.paper)
+    val bm = paperCache.getOrPut(theme.isDark) {
+        korlibs.image.bitmap.Bitmap32Context2d(Viewport.W, Viewport.H, true) {
+            val radius = hypot(w, h) * 0.5
+            fun wash(cx: Double, cy: Double, color: RGBA) {
+                fill(
+                    createRadialGradient(cx, cy, 0.0, cx, cy, radius).also {
+                        it.addColorStop(0.0, color)
+                        it.addColorStop(1.0, RGBA(color.r, color.g, color.b, 0))
+                    },
+                ) { rect(0.0, 0.0, w, h) }
+            }
+            if (theme.isDark) {
+                wash(w * 0.2, h * 0.1, rgba255(255, 253, 245, 0.025))
+                wash(w * 0.8, h * 0.9, rgba255(180, 138, 60, 0.05))
+            } else {
+                wash(w * 0.2, h * 0.1, rgba255(0, 0, 0, 0.025))
+                wash(w * 0.8, h * 0.9, rgba255(0, 0, 0, 0.03))
+            }
+        }
+    }
+    image(bm)
+}
 
 // Тонкие ребра 1 px цветом line_firm — рамка кнопки/сегмента/поля.
 private fun Container.borderRect(width: Double, height: Double, color: RGBA) {

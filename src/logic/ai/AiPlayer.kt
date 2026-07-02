@@ -7,10 +7,10 @@ import kotlin.math.*
 import kotlin.random.Random
 
 @Serializable
-enum class Difficulty(val label: String) {
-    EASY("Легко"),
-    MID("Средне"),
-    HARD("Сложно");
+enum class Difficulty {
+    EASY,
+    MID,
+    HARD;
 }
 
 interface AiPlayer {
@@ -54,18 +54,23 @@ class HeuristicAi(
 
         if (board.moveCount == 0) return Position(7, 7)
 
+        // Случайный tie-break среди равных по очкам: иначе партии детерминированы
+        // и заучиваются (первый кандидат в порядке итерации всегда побеждает).
         val candidates = candidateCells(board, radius = neighborhood)
-        var best = candidates.first()
+        val bests = mutableListOf<Position>()
         var bestScore = Long.MIN_VALUE
 
         for (pos in candidates) {
             val s = scoreMove(board, pos.row, pos.col, me, opp, opponentBias)
             if (s > bestScore) {
                 bestScore = s
-                best = pos
+                bests.clear()
+                bests += pos
+            } else if (s == bestScore) {
+                bests += pos
             }
         }
-        return best
+        return bests.random(Random.Default)
     }
 }
 

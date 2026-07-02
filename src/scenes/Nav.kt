@@ -70,12 +70,13 @@ object Nav {
     fun goSettings() = launch { container.changeTo(time = FADE, transition = crossfade) { SettingsScene() } }
     fun goHelp() = launch { container.changeTo(time = FADE, transition = crossfade) { HelpScene() } }
 
-    fun goVictory(winner: StoneColor) = launch {
+    // winner == null → ничья.
+    fun goVictory(winner: StoneColor?) = launch {
         currentVictoryWinner = winner
         container.changeTo(time = FADE, transition = crossfade) { VictoryScene() }
     }
 
-    var currentVictoryWinner: StoneColor = StoneColor.BLACK
+    var currentVictoryWinner: StoneColor? = StoneColor.BLACK
         private set
 
     private fun launch(block: suspend () -> Unit) {

@@ -15,11 +15,11 @@ class SettingsScene : Scene() {
         val w = Viewport.W.toDouble()
         val h = Viewport.H.toDouble()
 
-        solidRect(w, h, theme.paper)
+        kinPaperBackground(theme)
 
         onBackOrEscape { Nav.goMenu() }
 
-        kinTextButton("← Назад", color = theme.muted) { Nav.goMenu() }
+        kinTextButton(Str.BACK, color = theme.muted) { Nav.goMenu() }
             .apply {
                 alignment = TextAlignment.TOP_LEFT
                 position(24.0, 22.0)
@@ -27,7 +27,7 @@ class SettingsScene : Scene() {
 
         var y = 56.0
 
-        kinText("Настройки", Type.title, theme.ink) {
+        kinText(Str.SETTINGS_TITLE, Type.title, theme.ink) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
@@ -42,20 +42,20 @@ class SettingsScene : Scene() {
         }.position(24.0, y)
         y += 16.0
 
-        kinText("ПАРАМЕТРЫ ПАРТИИ", Type.labelCaps, theme.muted) {
+        kinText(Str.SETTINGS_SECTION, Type.labelCaps, theme.muted) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
         y += 32.0
 
         // Тема
-        kinFieldLabel("Тема", theme).apply {
+        kinFieldLabel(Str.SETTINGS_THEME, theme).apply {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
         y += 22.0
         kinSegmented(
-            items = listOf("☀  Свет", "☾  Тьма"),
+            items = listOf(Str.THEME_LIGHT, Str.THEME_DARK),
             initialIndex = if (SettingsStore.current.dark) 1 else 0,
             totalWidth = w - 48.0,
             theme = theme,
@@ -70,7 +70,7 @@ class SettingsScene : Scene() {
         y += 42.0 + 28.0
 
         // Сложность AI
-        kinFieldLabel("Сложность AI", theme).apply {
+        kinFieldLabel(Str.SETTINGS_DIFFICULTY, theme).apply {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
@@ -88,20 +88,20 @@ class SettingsScene : Scene() {
         y += 42.0 + 28.0
 
         // Помощники
-        kinFieldLabel("Помощники", theme).apply {
+        kinFieldLabel(Str.SETTINGS_HELPERS, theme).apply {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
         y += 22.0
 
         renderToggleRow(
-            this, w, y, "Подсказки ходов", SettingsStore.current.hints, theme,
+            this, w, y, Str.SETTINGS_HINTS, SettingsStore.current.hints, theme,
             onChange = { v -> SettingsStore.update { it.copy(hints = v) } },
         )
         y += 48.0
 
         renderToggleRow(
-            this, w, y, "Звуки и вибрация", SettingsStore.current.sound, theme,
+            this, w, y, Str.SETTINGS_SOUND, SettingsStore.current.sound, theme,
             last = true,
             onChange = { v -> SettingsStore.update { it.copy(sound = v) } },
         )
@@ -110,12 +110,12 @@ class SettingsScene : Scene() {
         // Footer
         val footerY = h - 36.0
         solidRect(w - 48.0, 1.0, theme.line) { position(24.0, footerY - 12.0) }
-        kinText("ВЕРСИЯ ${AppVersion.VERSION}", 11.0, theme.muted, Fonts.uiMedium) {
+        kinText(Str.SETTINGS_VERSION_PREFIX + AppVersion.VERSION, 11.0, theme.muted, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(24.0, footerY)
         }
         circle(radius = 3.0, fill = theme.gold) { position(w - 100.0, footerY) }
-        kinText("ОНЛАЙН", 11.0, theme.gold, Fonts.uiMedium) {
+        kinText(Str.SETTINGS_ONLINE, 11.0, theme.gold, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(w - 92.0, footerY)
         }

@@ -27,6 +27,13 @@ class KinBoardView(
         // Фон
         solidRect(total, total, theme.paperDeep)
 
+        // Кромка «керамики» из редизайна: светлый блик по верхней грани,
+        // тонкая тень сразу под нижней.
+        val topGlow = if (theme.isDark) rgba255(255, 253, 245, 0.04) else rgba255(255, 255, 255, 0.4)
+        val dropShadow = if (theme.isDark) rgba255(0, 0, 0, 0.4) else rgba255(0, 0, 0, 0.05)
+        solidRect(total, 1.0, topGlow)
+        solidRect(total, 1.0, dropShadow) { y = total }
+
         drawGrid()
 
         stonesLayer = container { }
