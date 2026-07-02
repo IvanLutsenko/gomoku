@@ -115,7 +115,7 @@ class SettingsScene : Scene() {
             position(24.0, footerY)
         }
         circle(radius = 3.0, fill = theme.gold) { position(w - 100.0, footerY) }
-        kinText("ОНЛАЙН", 11.0, theme.muted, Fonts.uiMedium) {
+        kinText("ОНЛАЙН", 11.0, theme.gold, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(w - 92.0, footerY)
         }

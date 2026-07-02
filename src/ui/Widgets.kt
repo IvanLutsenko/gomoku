@@ -17,7 +17,7 @@ private val cyrillicAll = CharacterSet(
     "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" +
         "абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
 )
-private val extraChars = CharacterSet("五目一二三四→☀☾·«»—–•")
+private val extraChars = CharacterSet("五目一二三四→☀☾·«»—–•★")
 private val kinChars = CharacterSet.LATIN_ALL + cyrillicAll + extraChars
 
 private val bitmapFontCache = mutableMapOf<Pair<Font, Double>, BitmapFont>()

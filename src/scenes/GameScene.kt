@@ -49,11 +49,13 @@ class GameScene : Scene() {
             theme = theme, onPress = { Nav.goMenu() },
         ).position(w - menuBtnW - 24.0, 20.0)
 
-        kinIconRound(
-            icon = if (theme.isDark) "☾" else "☀",
-            theme = theme,
+        // Квадратная themed-кнопка в стиле «МЕНЮ» — как в дизайне игрового экрана
+        // (круглая — только в главном меню).
+        kinButton(
+            width = 44.0, label = if (theme.isDark) "☾" else "☀",
+            small = true, centered = true, theme = theme,
             onPress = { Theme.toggle(); Nav.goGameKeepState() },
-        ).position(w - menuBtnW - 24.0 - 44.0, 16.0)
+        ).position(w - menuBtnW - 24.0 - 44.0 - 8.0, 20.0)
 
         // ── Layout ──────────────────────────────────────────────────────
         val turnIndicator = container { }.apply { position(w / 2.0, 92.0) }
@@ -125,7 +127,7 @@ class GameScene : Scene() {
             renderUi()
             if (res.gameState != GameState.PLAYING && res.winner != null) {
                 launch {
-                    delay(900)
+                    delay(1200) // как в дизайне: дать победной жиле «прозвучать»
                     Nav.goVictory(res.winner!!)
                 }
             }
@@ -200,12 +202,29 @@ class GameScene : Scene() {
             else -> "Ничья" to StoneColor.BLACK
         }
         val isBlack = color == StoneColor.BLACK
-        host.kinStone(isBlack = isBlack, radius = 6.0, theme = theme)
-            .position(-72.0, 0.0)
-        host.text(label, Type.bodyStrong.size, theme.ink, font = Fonts.uiSemiBold) {
+        val gameOver = game.gameState != GameState.PLAYING
+
+        // Центрируем пару «камень + текст (+ ★)» по фактической ширине текста.
+        val txt = host.kinText(label, Type.bodyStrong, theme.ink) {
             alignment = TextAlignment.MIDDLE_LEFT
-            position(-58.0, 0.0)
         }
+        val star = if (gameOver && game.gameState != GameState.DRAW) {
+            host.kinText("★", Type.bodyStrong.size, theme.gold, Fonts.uiSemiBold) {
+                alignment = TextAlignment.MIDDLE_LEFT
+            }
+        } else null
+
+        val stoneD = 12.0
+        val gap = 10.0
+        val starGap = 8.0
+        val totalW = stoneD + gap + txt.scaledWidth + (star?.let { starGap + it.scaledWidth } ?: 0.0)
+        var x = -totalW / 2.0
+        host.kinStone(isBlack = isBlack, radius = stoneD / 2.0, theme = theme)
+            .position(x + stoneD / 2.0, 0.0)
+        x += stoneD + gap
+        txt.position(x, 0.0)
+        x += txt.scaledWidth + starGap
+        star?.position(x, 0.0)
     }
 
     private fun renderHistoryDots(host: Container, theme: KinPalette) {
@@ -242,7 +261,9 @@ class GameScene : Scene() {
         host.removeChildren()
         host.kinButton(
             width = btnW, label = "← Отменить", small = true, centered = true, theme = theme,
-            enabled = game.getMoveCount() > 0 && game.gameState == GameState.PLAYING,
+            // Как в дизайне: отмена доступна и после победы — undoMove
+            // сбрасывает состояние в PLAYING, партию можно продолжить.
+            enabled = game.getMoveCount() > 0,
             onPress = onUndo,
         ).position(24.0, btnY)
         host.kinButton(
