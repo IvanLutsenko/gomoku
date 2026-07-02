@@ -16,9 +16,14 @@ class MenuScene : Scene() {
 
         solidRect(w, h, theme.paper)
 
-        // Android Back / desktop ESC из главного меню — закрытие приложения.
+        // Android Back из меню: НЕ вызываем preventDefault → KorgwActivity
+        // делает super.onBackPressed() и закрывает activity. Желаемое поведение.
+        // Desktop ESC: явно закрываем окно (там system back нет).
         keys.down {
-            if (it.key == Key.BACK || it.key == Key.ESCAPE) gameWindow.close()
+            if (it.key == Key.ESCAPE) {
+                gameWindow.close()
+                it.preventDefault()
+            }
         }
 
         // Theme toggle (top-right)
@@ -38,22 +43,22 @@ class MenuScene : Scene() {
             .position(centerX - 48.0, y)
         y += 96.0 + 8.0
 
-        // 五目
-        text("五目", Type.display.size, theme.ink, font = Fonts.serifJp) {
+        // 五目 — высота glyph-а ≈ Type.display.size, нужен явный gap.
+        kinText("五目", Type.display.size, theme.ink, Fonts.serifJp) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
-        y += 60.0
+        y += Type.display.size + 12.0
 
         // G O M O K U (caps tracking)
-        text("G  O  M  O  K  U", Type.trackingBrand.size, theme.muted, font = Fonts.uiMedium) {
+        kinText("G  O  M  O  K  U", Type.trackingBrand, theme.muted) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
         y += 18.0
 
         // italic подзаголовок
-        text("Пять камней в ряд", Type.captionItalic.size, theme.muted, font = Fonts.serifItalic) {
+        kinText("Пять камней в ряд", Type.captionItalic, theme.muted) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
@@ -97,7 +102,7 @@ class MenuScene : Scene() {
         // Footer
         val footerY = h - 28.0
         circle(3.0, theme.gold) { position(centerX - 88.0, footerY) }
-        text("2026 · KORGE EDITION", 11.0, theme.muted, font = Fonts.uiMedium) {
+        kinText("2026 · KORGE EDITION", 11.0, theme.muted, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(centerX - 80.0, footerY)
         }

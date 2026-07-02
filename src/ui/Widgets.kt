@@ -1,10 +1,59 @@
 package ui
 
 import korlibs.image.color.*
+import korlibs.image.font.*
 import korlibs.image.text.*
 import korlibs.korge.input.*
 import korlibs.korge.view.*
 import korlibs.math.geom.*
+
+// Резкий текст на любом DPI: TTF преобразуется в BitmapFont c physical-pixel
+// размером (size × dpiScale), а Text-view рендерится с logical textSize. Atlas
+// получается в native-resolution → 1:1 со screen-pixel-ом, без интерполяции.
+//
+// Default chars в `toBitmapFont` = LATIN_ALL без кириллицы. Расширяем:
+// + кириллица оба регистра + ё + цифры/иероглифы/стрелки/спецсимволы из UI.
+private val cyrillicAll = CharacterSet(
+    "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" +
+        "абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
+)
+private val extraChars = CharacterSet("五目一二三四→☀☾·«»—–•")
+private val kinChars = CharacterSet.LATIN_ALL + cyrillicAll + extraChars
+
+private val bitmapFontCache = mutableMapOf<Pair<Font, Double>, BitmapFont>()
+
+private fun bitmapFontFor(font: Font, atlasSize: Double): BitmapFont {
+    val key = font to atlasSize
+    return bitmapFontCache.getOrPut(key) {
+        font.toBitmapFont(fontSize = atlasSize, chars = kinChars)
+    }
+}
+
+fun Container.kinText(
+    label: String,
+    size: Double,
+    color: RGBA,
+    font: Font,
+    block: Text.() -> Unit = {},
+): Text {
+    val s = Display.dpiScale
+    val atlasSize = size * s
+    val bmpFont = bitmapFontFor(font, atlasSize)
+    // textSize == bmpFont.fontSize → атлас отрисовывается 1:1 без внутреннего
+    // scaling (метрики не плывут). Затем view.scale = 1/s даёт logical размер.
+    return text(label, atlasSize, color, font = bmpFont).apply {
+        scale = 1.0 / s
+        smoothing = true
+        block()
+    }
+}
+
+fun Container.kinText(
+    label: String,
+    type: KinType,
+    color: RGBA,
+    block: Text.() -> Unit = {},
+): Text = kinText(label, type.size, color, type.font(), block)
 
 // Тонкие ребра 1 px цветом line_firm — рамка кнопки/сегмента/поля.
 private fun Container.borderRect(width: Double, height: Double, color: RGBA) {
@@ -37,7 +86,7 @@ fun Container.kinButton(
     solidRect(width, height, bgColor)
     if (!primary) borderRect(width, height, theme.lineFirm)
 
-    val mainText = text(label, typo.size, fgColor, font = typo.font()) {
+    val mainText = kinText(label, typo, fgColor) {
         alignment = if (centered) TextAlignment.MIDDLE_CENTER else TextAlignment.MIDDLE_LEFT
     }
     mainText.position(
@@ -48,7 +97,7 @@ fun Container.kinButton(
     if (rightArrow) {
         val arrowAlpha = if (primary) 0.7 else 0.5
         val arrowColor = RGBA(fgColor.r, fgColor.g, fgColor.b, (255 * arrowAlpha).toInt())
-        text("→", 14.0, arrowColor, font = Fonts.ui) {
+        kinText("→", 14.0, arrowColor, Fonts.ui) {
             alignment = TextAlignment.MIDDLE_RIGHT
             position(width - padH, height / 2.0)
         }
@@ -66,7 +115,7 @@ fun Container.kinTextButton(
     label: String,
     color: RGBA = Theme.colors.muted,
     onPress: () -> Unit,
-): Text = text(label, Type.body.size, color, font = Type.body.font()).apply {
+): Text = kinText(label, Type.body, color).apply {
     onClick { onPress() }
 }
 
@@ -80,7 +129,7 @@ fun Container.kinIconRound(
     circle(size / 2.0, Colors.TRANSPARENT, stroke = theme.lineFirm, strokeThickness = 1.0) {
         position(size / 2.0, size / 2.0)
     }
-    text(icon, 14.0, theme.ink, font = Fonts.ui) {
+    kinText(icon, 14.0, theme.ink, Fonts.ui) {
         alignment = TextAlignment.MIDDLE_CENTER
         position(size / 2.0, size / 2.0)
     }
@@ -102,19 +151,24 @@ fun Container.kinToggle(
     val trackOff = if (theme.isDark) rgba255(255, 253, 245, 0.18) else rgba255(0, 0, 0, 0.15)
 
     val track = roundRect(Size(w, h), RectCorners(h / 2.0), fill = if (on) theme.ink else trackOff)
-    val thumb = circle(10.0, theme.paper) {
-        position(if (on) 32.0 else 12.0, 12.0)
+    val r = 10.0
+    val cy = h / 2.0
+    val cxOff = h / 2.0          // 12 — thumb-центр в left position
+    val cxOn = w - h / 2.0       // 32 — thumb-центр в right position
+    // shadow (рисуется первым, остаётся под thumb-ом)
+    val shadow = circle(r, RGBA(0, 0, 0, 50)).apply {
+        position((if (on) cxOn else cxOff) - r, cy - r + 1.0)
     }
-    // shadow
-    circle(10.0, RGBA(0, 0, 0, 50)).apply {
-        position(if (on) 32.0 else 12.0, 13.0)
-        sendChildToBack(this)  // appears under thumb
+    val thumb = circle(r, theme.paper).apply {
+        position((if (on) cxOn else cxOff) - r, cy - r)
     }
 
     solidRect(w, h, Colors.TRANSPARENT).onClick {
         on = !on
         track.colorMul = if (on) theme.ink else trackOff
-        thumb.x = if (on) 32.0 else 12.0
+        val cx = if (on) cxOn else cxOff
+        thumb.x = cx - r
+        shadow.x = cx - r
         onChange(on)
     }
 }
@@ -144,7 +198,7 @@ fun Container.kinSegmented(
         if (i > 0) {
             solidRect(1.0, height, theme.lineFirm) { x = i * itemWidth }
         }
-        val tx = text(label, Type.caption.size, if (isActive) theme.paper else theme.ink, font = Fonts.uiMedium) {
+        val tx = kinText(label, Type.caption.size, if (isActive) theme.paper else theme.ink, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_CENTER
             position(i * itemWidth + itemWidth / 2.0, height / 2.0)
         }
@@ -172,7 +226,7 @@ fun Container.kinSegmented(
 // ───────── Field label (caps) и ряд настроек ─────────
 
 fun Container.kinFieldLabel(text: String, theme: KinPalette = Theme.colors): Text =
-    text(capsTracked(text, 1), Type.labelCaps.size, theme.muted, font = Fonts.uiMedium)
+    kinText(capsTracked(text, 1), Type.labelCaps.size, theme.muted, Fonts.uiMedium)
 
 fun Container.kinRow(
     width: Double,
@@ -182,7 +236,7 @@ fun Container.kinRow(
     rightSlot: Container.() -> Unit,
 ): Container = container {
     val rowH = 48.0
-    text(label, Type.body.size, theme.ink, font = Fonts.ui) {
+    kinText(label, Type.body, theme.ink) {
         position(0.0, rowH / 2.0)
         alignment = TextAlignment.MIDDLE_LEFT
     }
@@ -190,10 +244,11 @@ fun Container.kinRow(
         position(width, rowH / 2.0)
         rightSlot()
         // Сместим внутренний контент так, чтобы его правый край был на width.
-        // Каждый child выравниваем по правому краю.
+        // Каждый child выравниваем по правому краю. scaledWidth/Height учитывают scale
+        // (kinText scaled 1/dpi), поэтому именно их используем, а не unscaled*.
         forEachChild { ch ->
-            ch.x -= ch.unscaledWidth
-            ch.y -= ch.unscaledHeight / 2.0
+            ch.x -= ch.scaledWidth
+            ch.y -= ch.scaledHeight / 2.0
         }
     }
     if (!last) {

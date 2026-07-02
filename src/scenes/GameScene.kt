@@ -28,19 +28,17 @@ class GameScene : Scene() {
 
         solidRect(w, h, theme.paper)
 
-        keys.down {
-            if (it.key == Key.BACK || it.key == Key.ESCAPE) Nav.goMenu()
-        }
+        onBackOrEscape { Nav.goMenu() }
 
         // ── Top bar ─────────────────────────────────────────────────────
-        text("五目", Type.subtitle.size, theme.ink, font = Fonts.serifJp) {
+        kinText("五目", Type.subtitle.size, theme.ink, Fonts.serifJp) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, 20.0)
         }
         val modeLabel = if (mode == GameMode.AI)
             "VS  AI · ${SettingsStore.current.aiDifficulty.label.uppercase()}"
         else "VS  ИГРОК"
-        text(modeLabel, Type.meta.size, theme.muted, font = Fonts.uiMedium) {
+        kinText(modeLabel, Type.meta, theme.muted) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, 50.0)
         }
@@ -83,9 +81,8 @@ class GameScene : Scene() {
         }.position(boardX + BoardSpec.TOTAL - 28.0, boardY + BoardSpec.TOTAL - 28.0)
 
         val bottomY = h - 78.0
-        val moveCountText = text(
-            "ХОД ${game.getMoveCount()}",
-            Type.meta.size, theme.muted, font = Fonts.uiMedium,
+        val moveCountText = kinText(
+            "ХОД ${game.getMoveCount()}", Type.meta, theme.muted,
         ).apply {
             alignment = TextAlignment.MIDDLE_LEFT
             position(24.0, bottomY)

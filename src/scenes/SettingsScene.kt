@@ -17,9 +17,7 @@ class SettingsScene : Scene() {
 
         solidRect(w, h, theme.paper)
 
-        keys.down {
-            if (it.key == Key.BACK || it.key == Key.ESCAPE) Nav.goMenu()
-        }
+        onBackOrEscape { Nav.goMenu() }
 
         kinTextButton("← Назад", color = theme.muted) { Nav.goMenu() }
             .apply {
@@ -29,7 +27,7 @@ class SettingsScene : Scene() {
 
         var y = 56.0
 
-        text("Настройки", Type.title.size, theme.ink, font = Fonts.serif) {
+        kinText("Настройки", Type.title, theme.ink) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
@@ -44,7 +42,7 @@ class SettingsScene : Scene() {
         }.position(24.0, y)
         y += 16.0
 
-        text("ПАРАМЕТРЫ ПАРТИИ", Type.labelCaps.size, theme.muted, font = Fonts.uiMedium) {
+        kinText("ПАРАМЕТРЫ ПАРТИИ", Type.labelCaps, theme.muted) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
@@ -112,12 +110,12 @@ class SettingsScene : Scene() {
         // Footer
         val footerY = h - 36.0
         solidRect(w - 48.0, 1.0, theme.line) { position(24.0, footerY - 12.0) }
-        text("ВЕРСИЯ ${AppVersion.VERSION}", 11.0, theme.muted, font = Fonts.uiMedium) {
+        kinText("ВЕРСИЯ ${AppVersion.VERSION}", 11.0, theme.muted, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(24.0, footerY)
         }
         circle(radius = 3.0, fill = theme.gold) { position(w - 100.0, footerY) }
-        text("ОНЛАЙН", 11.0, theme.muted, font = Fonts.uiMedium) {
+        kinText("ОНЛАЙН", 11.0, theme.muted, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(w - 92.0, footerY)
         }
@@ -129,7 +127,7 @@ class SettingsScene : Scene() {
         last: Boolean = false,
         onChange: (Boolean) -> Unit,
     ) {
-        host.text(label, Type.body.size, theme.ink, font = Fonts.ui) {
+        host.kinText(label, Type.body, theme.ink) {
             alignment = TextAlignment.MIDDLE_LEFT
             position(24.0, y + 24.0)
         }

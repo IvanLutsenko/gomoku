@@ -1,12 +1,26 @@
 package scenes
 
+import korlibs.event.*
 import korlibs.io.async.*
+import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.view.*
 import korlibs.math.interpolation.*
 import korlibs.time.*
 import logic.*
 import model.*
+
+// Android Back/Esc обработчик с consume-ом события: KorgwActivity.onBackPressed
+// диспатчит Key.BACK и смотрит KeyEvent.defaultPrevented. Если не вызвать
+// `it.preventDefault()`, activity делает fallback (закрытие приложения).
+fun View.onBackOrEscape(handler: () -> Unit) {
+    keys.down {
+        if (it.key == Key.BACK || it.key == Key.ESCAPE) {
+            handler()
+            it.preventDefault()
+        }
+    }
+}
 
 // Свой crossfade: видим оба кадра поверх друг друга, прозрачность плывёт
 // от 1→0 и 0→1. KorGE имеет `crossfade`, но он @Deprecated в 6.x.

@@ -14,13 +14,12 @@ suspend fun main() = Korge(
     Fonts.loadOnce()
     SettingsStore.load()
 
+    // Live source of native width — surface size becomes known only after
+    // first frame on Android, поэтому читаем лениво при каждом kinText().
+    Display.nativeWidthProvider = { views.nativeWidth }
+
     val container = sceneContainer()
     Nav.container = container
 
-    if (SettingsStore.current.firstRun) {
-        SettingsStore.update { it.copy(firstRun = false) }
-        container.changeTo { HelpScene() }
-    } else {
-        container.changeTo { MenuScene() }
-    }
+    container.changeTo { MenuScene() }
 }

@@ -175,6 +175,20 @@ object Viewport {
     const val H = 720
 }
 
+// DPI-масштаб для font-atlas: чтобы текст был резким на любом устройстве,
+// атлас рендерится в physical px (`type.size × dpiScale`), а view ставится в `scale = 1/dpiScale`.
+// На JVM с окном 360×720 — 1.0; на FullHD-телефоне — 3.0; на QHD — 4.0.
+// Источник — `Stage.views.nativeWidth`, читается лениво из main.kt callback-а,
+// потому что surface на Android создаётся позже main(), и nativeWidth на момент
+// старта ещё равен virtual width (360).
+object Display {
+    var nativeWidthProvider: () -> Int = { Viewport.W }
+    // Oversample минимум 4×: атлас сильно крупнее экрана → downsampling
+    // сглаживает edge-pixels, в отличие от нечёткого 1:1 ratio при stage-scale ≈ 2.5.
+    val dpiScale: Double
+        get() = (nativeWidthProvider().toDouble() / Viewport.W).coerceAtLeast(4.0)
+}
+
 // Caps tracking helper — KorGE Text doesn't expose letter-spacing, so we
 // emulate the "G O M O K U" effect by inserting spaces. For tracking values
 // like 1.5/2 we just use a single space; the design uses much wider spacing

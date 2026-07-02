@@ -6,6 +6,7 @@ plugins {
 
 korge {
 	id = "com.awac.gomoku"
+    name = "Gomoku"
     icon = file("resources/icon.png")
     androidAppendBuildGradle("android.defaultConfig.multiDexEnabled true\n")
 

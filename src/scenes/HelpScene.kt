@@ -25,9 +25,7 @@ class HelpScene : Scene() {
 
         solidRect(w, h, theme.paper)
 
-        keys.down {
-            if (it.key == Key.BACK || it.key == Key.ESCAPE) Nav.goMenu()
-        }
+        onBackOrEscape { Nav.goMenu() }
 
         kinTextButton("← Назад", color = theme.muted) { Nav.goMenu() }
             .apply {
@@ -37,7 +35,7 @@ class HelpScene : Scene() {
 
         var y = 56.0
 
-        text("Помощь", Type.title.size, theme.ink, font = Fonts.serif) {
+        kinText("Помощь", Type.title, theme.ink) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
@@ -53,7 +51,7 @@ class HelpScene : Scene() {
         }.position(24.0, y - 4.0)
         y += 16.0
 
-        text("ПРАВИЛА И СОВЕТЫ", Type.labelCaps.size, theme.muted, font = Fonts.uiMedium) {
+        kinText("ПРАВИЛА И СОВЕТЫ", Type.labelCaps, theme.muted) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
@@ -67,12 +65,12 @@ class HelpScene : Scene() {
 
     private fun renderEntry(host: Container, y: Double, entry: HelpEntry, theme: KinPalette) {
         // Иероглиф
-        host.text(entry.num, Type.ideogram.size, theme.gold, font = Fonts.serifJp) {
+        host.kinText(entry.num, Type.ideogram, theme.gold) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y - 2.0)
         }
         // Заголовок
-        host.text(entry.title, 16.0, theme.ink, font = Fonts.uiSemiBold) {
+        host.kinText(entry.title, 16.0, theme.ink, Fonts.uiSemiBold) {
             alignment = TextAlignment.TOP_LEFT
             position(72.0, y)
         }
@@ -80,7 +78,7 @@ class HelpScene : Scene() {
         val maxW = Viewport.W - 72.0 - 24.0
         val lines = wrap(entry.body, maxW.toInt(), perCharPx = 7)
         lines.forEachIndexed { i, line ->
-            host.text(line, 14.0, theme.inkSoft, font = Fonts.ui) {
+            host.kinText(line, 14.0, theme.inkSoft, Fonts.ui) {
                 alignment = TextAlignment.TOP_LEFT
                 position(72.0, y + 26.0 + i * 22.0)
             }

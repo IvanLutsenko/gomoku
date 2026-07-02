@@ -17,9 +17,7 @@ class VictoryScene : Scene() {
 
         solidRect(w, h, theme.paper)
 
-        keys.down {
-            if (it.key == Key.BACK || it.key == Key.ESCAPE) Nav.goMenu()
-        }
+        onBackOrEscape { Nav.goMenu() }
 
         val winner = Nav.currentVictoryWinner
 
@@ -49,15 +47,15 @@ class VictoryScene : Scene() {
         }
         y += 96.0 + 28.0
 
-        text("ПАРТИЯ ЗАВЕРШЕНА", Type.meta.size, theme.muted, font = Fonts.uiMedium) {
+        kinText("ПАРТИЯ ЗАВЕРШЕНА", Type.meta, theme.muted) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
         }
         y += 22.0
 
-        text(
+        kinText(
             if (winner == StoneColor.BLACK) "Чёрные победили" else "Белые победили",
-            40.0, theme.ink, font = Fonts.serif,
+            40.0, theme.ink, Fonts.serif,
         ) {
             alignment = TextAlignment.TOP_CENTER
             position(centerX, y)
