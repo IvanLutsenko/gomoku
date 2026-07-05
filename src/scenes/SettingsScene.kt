@@ -13,7 +13,6 @@ class SettingsScene : Scene() {
     override suspend fun SContainer.sceneMain() {
         val theme = Theme.colors
         val w = Viewport.W.toDouble()
-        val h = Viewport.H.toDouble()
 
         kinPaperBackground(theme)
 
@@ -67,7 +66,25 @@ class SettingsScene : Scene() {
                 }
             },
         ).position(24.0, y)
-        y += 42.0 + 18.0
+        y += 42.0 + 14.0
+
+        // Правила: классика / рэндзю (запреты для чёрных)
+        kinFieldLabel(Str.SETTINGS_RULES, theme).apply {
+            alignment = TextAlignment.TOP_LEFT
+            position(24.0, y)
+        }
+        y += 22.0
+        val rulesList = listOf(Rules.CLASSIC, Rules.RENJU)
+        kinSegmented(
+            items = listOf(Str.RULES_CLASSIC, Str.RULES_RENJU),
+            initialIndex = rulesList.indexOf(SettingsStore.current.rules).coerceAtLeast(0),
+            totalWidth = w - 48.0,
+            theme = theme,
+            onChange = { idx ->
+                SettingsStore.update { it.copy(rules = rulesList[idx]) }
+            },
+        ).position(24.0, y)
+        y += 42.0 + 14.0
 
         // Сложность AI
         kinFieldLabel(Str.SETTINGS_DIFFICULTY, theme).apply {
@@ -85,7 +102,7 @@ class SettingsScene : Scene() {
                 SettingsStore.update { it.copy(aiDifficulty = diffs[idx]) }
             },
         ).position(24.0, y)
-        y += 42.0 + 18.0
+        y += 42.0 + 14.0
 
         // Цвет игрока в AI-режиме (чередование по умолчанию)
         kinFieldLabel(Str.SETTINGS_PLAYER_COLOR, theme).apply {
@@ -103,7 +120,7 @@ class SettingsScene : Scene() {
                 SettingsStore.update { it.copy(playerColor = colorPrefs[idx]) }
             },
         ).position(24.0, y)
-        y += 42.0 + 18.0
+        y += 42.0 + 14.0
 
         // Помощники
         kinFieldLabel(Str.SETTINGS_HELPERS, theme).apply {
@@ -139,19 +156,7 @@ class SettingsScene : Scene() {
             },
         )
         y += 44.0
-
-        // Footer
-        val footerY = h - 36.0
-        solidRect(w - 48.0, 1.0, theme.line) { position(24.0, footerY - 12.0) }
-        kinText(Str.SETTINGS_VERSION_PREFIX + AppVersion.VERSION, 11.0, theme.muted, Fonts.uiMedium) {
-            alignment = TextAlignment.MIDDLE_LEFT
-            position(24.0, footerY)
-        }
-        circle(radius = 3.0, fill = theme.gold) { position(w - 100.0, footerY) }
-        kinText(Str.SETTINGS_ONLINE, 11.0, theme.gold, Fonts.uiMedium) {
-            alignment = TextAlignment.MIDDLE_LEFT
-            position(w - 92.0, footerY)
-        }
+        // Футер с версией убран по ревью дизайна (SCREENS.md §4).
     }
 
     private fun renderToggleRow(

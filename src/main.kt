@@ -13,6 +13,10 @@ suspend fun main() = Korge(
 ) {
     Fonts.loadOnce()
     SettingsStore.load()
+    if (SettingsStore.current.firstRunAt == 0L) {
+        SettingsStore.update { it.copy(firstRunAt = korlibs.time.DateTime.now().unixMillisLong) }
+    }
+    RecordsStore.load()
     MusicPlayer.init(views.coroutineContext)
 
     // Live source of native width — surface size becomes known only after
@@ -22,5 +26,5 @@ suspend fun main() = Korge(
     val container = sceneContainer()
     Nav.container = container
 
-    container.changeTo { MenuScene() }
+    container.changeTo { SplashScene() }
 }

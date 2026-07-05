@@ -36,6 +36,17 @@ class MenuScene : Scene() {
             },
         ).position(w - 56.0, 36.0)
 
+        // Татэгаки — вертикальная надпись 五目並べ на правом поле
+        container {
+            Str.BRAND_VERTICAL.forEachIndexed { i, ch ->
+                kinText(ch.toString(), 10.0, theme.muted, Fonts.serifJp) {
+                    alignment = TextAlignment.TOP_CENTER
+                    position(0.0, i * 17.0)
+                }
+            }
+            alpha = 0.5
+        }.position(w - 29.0, 118.0)
+
         var y = 64.0
 
         // Энсо
@@ -91,20 +102,49 @@ class MenuScene : Scene() {
         ).position(btnX, y)
         y += 52.0 + 12.0
 
-        // Маленькие кнопки в ряд
+        // Маленькие кнопки 2×2: Журнал/Печати, Настройки/Помощь
         val gap = 12.0
         val smallW = (btnW - gap) / 2.0
+        kinButton(width = smallW, label = Str.MENU_JOURNAL, small = true, theme = theme, onPress = { Nav.goJournal() })
+            .position(btnX, y)
+        kinButton(width = smallW, label = Str.MENU_SEALS, small = true, theme = theme, onPress = { Nav.goSeals() })
+            .position(btnX + smallW + gap, y)
+        y += 44.0 + 8.0
         kinButton(width = smallW, label = Str.MENU_SETTINGS, small = true, theme = theme, onPress = { Nav.goSettings() })
             .position(btnX, y)
         kinButton(width = smallW, label = Str.MENU_HELP, small = true, theme = theme, onPress = { Nav.goHelp() })
             .position(btnX + smallW + gap, y)
+        y += 44.0 + 18.0
 
-        // Footer
+        // Вход в Чайную — тихая строка под кнопками. 茶 есть только в
+        // Noto Serif JP, поэтому строка собирается из двух шрифтов.
+        container {
+            val part1 = kinText(Str.MENU_TEA_WORD, Type.captionItalic.size, theme.muted, Fonts.serifItalic) {
+                alignment = TextAlignment.TOP_LEFT
+            }
+            val part2 = kinText(Str.MENU_TEA_GLYPH, Type.captionItalic.size, theme.muted, Fonts.serifJp) {
+                alignment = TextAlignment.TOP_LEFT
+                position(part1.scaledWidth, 0.0)
+            }
+            val totalW = part1.scaledWidth + part2.scaledWidth
+            position(centerX - totalW / 2.0, y)
+            solidRect(totalW, 20.0, korlibs.image.color.Colors.TRANSPARENT)
+                .onClick { Nav.goTea() }
+        }
+
+        // Footer: ханко — киноварная печать 五 + подпись
         val footerY = h - 28.0
-        circle(3.0, theme.gold) { position(centerX - 88.0, footerY) }
+        container {
+            roundRect(korlibs.math.geom.Size(16.0, 16.0), korlibs.math.geom.RectCorners(2.0), fill = theme.vermillion)
+            kinText(Str.HANKO, 10.0, KIN_LIGHT.paper, Fonts.serifJp) {
+                alignment = TextAlignment.MIDDLE_CENTER
+                position(8.0, 8.5)
+            }
+            alpha = 0.9
+        }.position(centerX - 96.0, footerY - 8.0)
         kinText(Str.FOOTER_EDITION, 11.0, theme.muted, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_LEFT
-            position(centerX - 80.0, footerY)
+            position(centerX - 72.0, footerY)
         }
     }
 }

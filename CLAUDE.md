@@ -27,10 +27,10 @@ export JAVA_HOME=/Users/lutse/Library/Java/JavaVirtualMachines/jbrsdk_jcef-21.0.
 
 KorGE-плагин маппит исходники прямо из корня репозитория, **без** `src/main/kotlin` или `src/commonMain/kotlin`:
 
-- `src/main.kt` — точка входа (`suspend fun main() = Korge { ... }`), монтирует `sceneContainer` и `Nav`. Грузит `Fonts` и `SettingsStore`, стартует сразу в `MenuScene`.
-- `src/scenes/` — экраны (`MenuScene`, `GameScene`, `SettingsScene`, `HelpScene`) + `Nav` (роутинг) + `GameSession` (текущая партия, цвет игрока, лимит подсказок). Экрана победы нет — финал показывается оверлеем в `GameScene`.
-- `src/ui/` — дизайн-система Kintsugi: `Theme.kt` (палитры/типы/spacing, читает `dark` из `SettingsStore`), `KinSeam.kt` (золотая жила), `Stone.kt`, `Enso.kt`, `Widgets.kt` (кнопки/тогглы/сегменты + `kinText` DPI-резкий текст + `kinPaperBackground`), `KinBoard.kt` (доска со слоем подсказок), `Strings.kt` (**все пользовательские строки** — object `Str`, задел под локализацию; новые UI-тексты добавляй только туда).
-- `src/logic/` — пакет `logic`. `GameLogic.kt` (правила), `Settings.kt` (`Settings` + `SettingsStore` с JSON-персистом в `applicationDataVfs`).
+- `src/main.kt` — точка входа (`suspend fun main() = Korge { ... }`), монтирует `sceneContainer` и `Nav`. Грузит `Fonts`, `SettingsStore` и `RecordsStore`, стартует сразу в `MenuScene`.
+- `src/scenes/` — экраны (`SplashScene`, `MenuScene`, `GameScene`, `SettingsScene`, `HelpScene`, `JournalScene`, `SealsScene`, `KifuScene`, `TeaScene`, `EndScenes.kt` = `VictoryScene`+`DefeatScene`) + `Nav` (роутинг) + `GameSession` (текущая партия, цвет игрока, лимит подсказок, снимок финала + новые печати). Финал партии — полноэкранные сцены Victory/Defeat (редизайн 2026-07); «Посмотреть доску» возвращает на доску, где отмена хода реанимирует партию (`GameSession.reopen()`); просмотр записи — `KifuScene` (номера ходов, «Поделиться» = нотация в буфер, «Сохранить» = PNG в ~/Downloads). `TeaScene` — поддержка проекта, покупки пока заглушка. Старт — `SplashScene` (~1.2 с, identity-мотив).
+- `src/ui/` — дизайн-система Kintsugi: `Theme.kt` (палитры/типы/spacing + `BtnSpec` — радиус 10, primary-тон киноварь; читает `dark` из `SettingsStore`), `KinSeam.kt` (золотая жила), `AkaiIto.kt` (красная нить), `MiniBoard.kt` (плоский снимок позиции), `Stone.kt`, `Enso.kt`, `Widgets.kt` (кнопки/тогглы/сегменты + `kinText` DPI-резкий текст + `kinPaperBackground`), `KinBoard.kt` (доска со слоями подсказок/ghost/тэнгэн-пульс/вспышка запретной точки), `Strings.kt` (**все пользовательские строки** — object `Str`, задел под локализацию; новые UI-тексты добавляй только туда).
+- `src/logic/` — пакет `logic`. `GameLogic.kt` (правила, флаг `renju`), `RenjuRules.kt` (запреты рэндзю для чёрных), `Settings.kt` (`Settings` + `SettingsStore`), `Records.kt` (`RecordsStore` — журнал партий, статистика, печати-достижения; JSON-персист рядом с settings.json).
 - `src/logic/ai/AiPlayer.kt` — `Difficulty` enum, `AiFactory`, `RandomNearAi`, `HeuristicAi` (single-ply scoring threats). `topMoves(...)` для подсказок.
 - `src/model/` — пакет `model` (модель данных).
 - `test/` — тесты (пакет `test` для скриптовых, корневой пакет для `ViewsForTesting`).
@@ -43,14 +43,20 @@ KorGE-плагин маппит исходники прямо из корня р
 ## Архитектура
 
 ```
-main.kt → MenuScene
+main.kt → SplashScene (~1.2 с) → MenuScene
             ├→ GameScene (через Nav.goGame; GameSession хранит GameLogic)
-            │     ├→ victory-оверлей поверх доски (не отдельная сцена;
-            │     │   «Посмотреть доску» прячет его, партию можно отмотать)
+            │     ├→ VictoryScene / DefeatScene (через 1200 мс после финала;
+            │     │       ├→ KifuScene (запись партии, назад — на экран финала)
+            │     │       └→ «Посмотреть доску» → GameScene (undo реанимирует партию)
             │     └→ MenuScene
+            ├→ JournalScene (журнал партий; тап по записи → KifuScene)
+            ├→ SealsScene (печати-достижения)
+            ├→ TeaScene (Чайная — поддержка; покупки-заглушки)
             ├→ SettingsScene
-            └→ HelpScene
+            └→ HelpScene (скролл вертикальным drag-ом)
 ```
+
+Реклама НЕ подключена; выбор сети и маппинг на «тихую рекламу» из дизайна — `docs/ADS.md`.
 
 - **`scenes/Nav.kt`** — singleton с ссылкой на `SceneContainer`. Все навигационные функции синхронные (`Nav.goMenu()` и т.п.); внутри `launchImmediately` запускает `sceneContainer.changeTo<MyScene>()`.
 - **`GameSession`** (в Nav.kt) — синглтон с текущим `GameLogic`, `GameMode`, `humanColor` (настройка «цвет игрока»: чередование/белые/чёрные, чередование считается при `newGame`) и `hintsLeft` (лимит подсказок на партию). Переживает переключения сцен и темы, чтобы `Theme.toggle() + Nav.goGameKeepState()` не сбрасывал партию.
@@ -98,7 +104,11 @@ export JAVA_HOME=/Users/lutse/Library/Java/JavaVirtualMachines/jbrsdk_jcef-21.0.
 
 `logic/ai/AiPlayer.kt` — оценка ходов скользящими окнами длины 5 (`evalWindows`): окно засчитывается стороне, только если в нём нет чужих камней, поэтому разрывные паттерны (`XX_XX`, `X_XXX`) оцениваются естественно. `scoreMove` = атака + защита×bias + центр-бонус. `Difficulty.EASY` — `RandomNearAi` (случайная клетка в радиусе 2 от занятых). `MID` — окна с радиусом 1 и opponentBias 0.9. `HARD` — радиус 2, bias 1.0, **depth 2**: по топ-10 кандидатам симулируется свой ход (place/undo на реальном Board — безопасно, UI заблокирован на время `chooseMove`) и вычитается лучший ответ соперника. Tie-break случайный. Подсказки (`topMoves`) — single-ply та же оценка; в игре они по запросу: кнопка «Подсказка · N», `GameSession.hintsLeft` (3 на партию), подсветка живёт до следующего redraw.
 
-В `GameScene` цвет человека — `GameSession.humanColor` (настройка: чередование/белые/чёрные; при «чередовать» флип на каждом `newGame` AI-режима). После хода игрока в AI-режиме планируется `aiTurn()` через `launch { delay(450); ... }`. Пока AI «думает», `aiThinking` блокирует клики (через `isHumanTurn()`) **и кнопку Undo** (`busy` в `renderControls`) — иначе undo мутировал бы `Board`, который `chooseMove` читает на `Dispatchers.Default`. После `chooseMove` состояние перепроверяется перед применением хода. Undo в AI-режиме откатывает 2 хода (свой + AI), чтобы вернуть очередь игроку; undo доступен и после победы — `undoMove` возвращает партию в PLAYING. Опция `confirmMoves` — ход в два тапа через ghost-камень (`KinBoardView.showGhost`).
+В `GameScene` цвет человека — `GameSession.humanColor` (настройка: чередование/белые/чёрные; при «чередовать» флип на каждом `newGame` AI-режима). После хода игрока в AI-режиме планируется `aiTurn()` через `launch { delay(450); ... }`. Пока AI «думает», `aiThinking` блокирует клики (через `isHumanTurn()`) **и кнопку Undo** (`busy` в `renderControls`) — иначе undo мутировал бы `Board`, который `chooseMove` читает на `Dispatchers.Default`. После `chooseMove` состояние перепроверяется перед применением хода. Undo в AI-режиме откатывает 2 хода (свой + AI), чтобы вернуть очередь игроку; после финала undo недоступен (редизайн 2026-07) — просмотр партии через `KifuScene`. Опция `confirmMoves` — ghost-камень с киноварным перекрестием + панель «Поставить камень»/«×» внизу (`KinBoardView.showGhost`).
+
+**Рэндзю** (настройка «Правила»): `GameLogic(renju = true)` через `RenjuRules` запрещает чёрным overline (>5), двойную четвёрку и двойную тройку; ровно пять — победа, приоритетнее запрета; направление с четвёркой не считается тройкой (легальное 四三). Реализация наивная, без рекурсивного исключения запрещённых точек в открытых тройках (см. ponytail-комментарий в RenjuRules.kt). AI фильтрует кандидатов через `legalCandidates` → `canMakeMove`. UI на `MoveResult.Forbidden`: дрожание доски, киноварная вспышка точки, строка причины под доской.
+
+**Журнал и печати**: `GameSession.recordFinished()` при финале пишет `GameRecord` в `RecordsStore` (`records.json`, до 50 партий) и начисляет печати (9 в коллекции + легенда 和 за ничью + мастерская 極 за полную коллекцию — производная). Новая печать показывается оттиском на `VictoryScene`.
 
 ## Settings persistence
 
@@ -114,6 +124,6 @@ export JAVA_HOME=/Users/lutse/Library/Java/JavaVirtualMachines/jbrsdk_jcef-21.0.
 - `VEINS.md` — каталог золотых жил по экранам (координаты, jitter, seed, branches).
 - `tokens/{colors,typography,spacing,components}.json` — токены, нормативный JSON.
 
-Базовый принцип: один акцент — золото. Киноварь только на маркер последнего хода. Углы 0 (никаких radius). Все отступы кратны 4. Ничего не добавляй в дизайн «от себя» — если задача требует нового элемента, сверься с системой.
+Базовый принцип: один акцент — золото. Киноварь — второй тон (ревизия 2026-07): primary-кнопки, активные сегменты, тогглы-on, печати-ханко, маркер последнего хода и запретная точка рэндзю. Углы: кнопки/сегменты r=10, печати r=5–6 (`BtnSpec` в Theme.kt), больших радиусов нет. Все отступы кратны 4. Ничего не добавляй в дизайн «от себя» — если задача требует нового элемента, сверься с системой.
 
 При изменении токена синхронизируй между `docs/design/tokens/colors.json` и `ui/Theme.kt` (`KIN_LIGHT`/`KIN_DARK`). JSON — нормативный.

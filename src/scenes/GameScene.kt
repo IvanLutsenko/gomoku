@@ -1,20 +1,25 @@
 package scenes
 
 import korlibs.audio.sound.*
-import korlibs.event.*
+import korlibs.image.bitmap.*
 import korlibs.image.color.*
 import korlibs.image.text.*
 import korlibs.io.file.std.*
+import korlibs.io.lang.*
 import korlibs.korge.input.*
 import korlibs.korge.scene.*
 import korlibs.korge.service.vibration.*
 import korlibs.korge.view.*
+import korlibs.math.geom.*
 import korlibs.time.*
 import kotlinx.coroutines.*
 import logic.*
 import logic.ai.*
 import model.*
 import ui.*
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.random.Random
 
 class GameScene : Scene() {
 
@@ -54,8 +59,6 @@ class GameScene : Scene() {
             theme = theme, onPress = { Nav.goMenu() },
         ).position(w - menuBtnW - 24.0, 20.0)
 
-        // Квадратная themed-кнопка в стиле «МЕНЮ» — как в дизайне игрового экрана
-        // (круглая — только в главном меню).
         kinButton(
             width = 44.0, label = if (theme.isDark) "☾" else "☀",
             small = true, centered = true, theme = theme,
@@ -63,7 +66,9 @@ class GameScene : Scene() {
         ).position(w - menuBtnW - 24.0 - 44.0 - 8.0, 20.0)
 
         // ── Layout ──────────────────────────────────────────────────────
-        val turnIndicator = container { }.apply { position(w / 2.0, 92.0) }
+        // Чипы соперников + акай ито (красная нить) между ними
+        val chipsContainer = container { }.apply { position(w / 2.0, 84.0) }
+        kinAkaiItoH(230.0, theme).position(w / 2.0 - 115.0, 100.0)
 
         val boardX = (w - BoardSpec.TOTAL) / 2.0
         val boardY = 116.0
@@ -87,6 +92,29 @@ class GameScene : Scene() {
             )
         }.position(boardX + BoardSpec.TOTAL - 28.0, boardY + BoardSpec.TOTAL - 28.0)
 
+        // 思考中 — татэгаки у правого края доски, пока AI думает
+        val thinkingLabel = container {
+            Str.THINKING_VERTICAL.forEachIndexed { i, ch ->
+                kinText(ch.toString(), 9.0, theme.muted, Fonts.serifJp) {
+                    alignment = TextAlignment.TOP_CENTER
+                    position(0.0, i * 15.0)
+                }
+            }
+            alpha = 0.45
+            visible = false
+        }.position(boardX + BoardSpec.TOTAL - 8.0, boardY + 8.0)
+
+        // Редкий лепесток сакуры — падает над доской при бездействии («Дыхание»).
+        val petalLayer = container { }
+        launch {
+            while (true) {
+                delay(9_000L + Random.nextLong(8_000L))
+                if (game.gameState == GameState.PLAYING) {
+                    spawnPetal(petalLayer, boardX, boardY)
+                }
+            }
+        }
+
         val bottomY = h - 78.0
         val moveCountText = kinText(
             Str.GAME_MOVE_PREFIX + game.getMoveCount(), Type.meta, theme.muted,
@@ -94,12 +122,13 @@ class GameScene : Scene() {
             alignment = TextAlignment.MIDDLE_LEFT
             position(24.0, bottomY)
         }
-        val historyContainer = container { }.position(w - 24.0, bottomY)
+        kinText(Str.GAME_15X15, Type.meta, theme.muted) {
+            alignment = TextAlignment.MIDDLE_RIGHT
+            position(w - 24.0, bottomY)
+        }
         val controlsContainer = container { }
         val hintContainer = container { }.position(w / 2.0, boardY + BoardSpec.TOTAL + 34.0)
-        val overlayContainer = container { }
         val btnY = h - 50.0
-        val btnW = (w - 24.0 * 2.0 - 10.0) / 2.0
 
         // ── Логика. Чтобы избежать forward-reference проблемы локальных
         // функций, держим колбэки в `var`-переменных. ────────────────────
@@ -107,6 +136,7 @@ class GameScene : Scene() {
         var pendingMove: Pair<Int, Int>? = null
 
         var renderUi: () -> Unit = {}
+        var renderControlsRef: () -> Unit = {}
         var undoAndRefresh: () -> Unit = {}
         var newGame: () -> Unit = {}
         var applyMoveRef: (Int, Int) -> Boolean = { _, _ -> false }
@@ -116,55 +146,82 @@ class GameScene : Scene() {
                 (mode == GameMode.PVP || game.currentPlayer == humanColor) &&
                 !aiThinking
 
-        renderUi = {
-            pendingMove = null
-            boardView.redraw() // сбрасывает и ghost, и подсказки не переживают ход
-            renderTurnIndicator(turnIndicator, theme, aiThinking)
-            moveCountText.text = Str.GAME_MOVE_PREFIX + game.getMoveCount()
-            renderHistoryDots(historyContainer, theme)
-            renderHintButton(hintContainer, theme, boardView, canHint = isHumanTurn())
+        renderControlsRef = {
             renderControls(
-                controlsContainer, theme, btnY, btnW, game, busy = aiThinking,
+                controlsContainer, theme, btnY, game,
+                busy = aiThinking, pending = pendingMove,
                 onUndo = { undoAndRefresh() }, onNew = { newGame() },
+                onCancel = {
+                    pendingMove = null
+                    boardView.clearGhost()
+                    renderControlsRef()
+                },
+                onConfirm = {
+                    val p = pendingMove
+                    if (p != null) {
+                        pendingMove = null
+                        boardView.clearGhost()
+                        if (applyMoveRef(p.first, p.second) &&
+                            mode == GameMode.AI && game.gameState == GameState.PLAYING
+                        ) {
+                            launch { aiTurnRef() }
+                        }
+                    }
+                },
             )
         }
 
-        applyMoveRef = lam@{ r, c ->
-            val res = game.makeMove(r, c)
-            if (res !is MoveResult.Success) return@lam false
-            triggerHaptic(strong = res.winner != null)
-            playStoneSound()
-            renderUi()
-            if (res.gameState != GameState.PLAYING) {
-                launch {
-                    delay(1200) // дать победной жиле «прорасти»
-                    // Undo после победы мог вернуть партию — перепроверяем.
-                    if (game === GameSession.game && game.gameState != GameState.PLAYING) {
-                        showVictoryOverlay(overlayContainer, theme, res.winner, game.getMoveCount())
-                    }
-                }
-            }
-            true
+        renderUi = {
+            pendingMove = null
+            boardView.redraw() // сбрасывает и ghost, и подсказки не переживают ход
+            renderChips(chipsContainer, theme, aiThinking)
+            thinkingLabel.visible = aiThinking
+            moveCountText.text = Str.GAME_MOVE_PREFIX + game.getMoveCount()
+            renderHintButton(hintContainer, theme, boardView, canHint = isHumanTurn())
+            renderControlsRef()
         }
 
-        suspend fun aiTurn() {
-            if (mode != GameMode.AI || game.gameState != GameState.PLAYING || game.currentPlayer != aiColor) return
-            aiThinking = true
-            renderUi()
-            delay(450)
-            val pos = withContext(Dispatchers.Default) { ai.chooseMove(game) }
-            aiThinking = false
-            // Пока AI «думал», партию могли сбросить/откатить (кнопки блокируются
-            // через busy, но новая партия пересоздаёт сцену, а корутина живёт) —
-            // перепроверяем, что ход всё ещё за AI.
-            if (game !== GameSession.game || game.gameState != GameState.PLAYING ||
-                game.currentPlayer != aiColor
-            ) return
-            applyMoveRef(pos.row, pos.col)
+        applyMoveRef = lam@{ r, c ->
+            when (val res = game.makeMove(r, c)) {
+                is MoveResult.Success -> {
+                    triggerHaptic(strong = res.winner != null)
+                    playStoneSound()
+                    renderUi()
+                    if (res.gameState != GameState.PLAYING) {
+                        GameSession.recordFinished()
+                        launch {
+                            delay(1200) // дать победной жиле «прорасти»
+                            if (game === GameSession.game && game.gameState != GameState.PLAYING) {
+                                val lost = mode == GameMode.AI &&
+                                    res.winner != null && res.winner != humanColor
+                                if (lost) Nav.goDefeat() else Nav.goVictory()
+                            }
+                        }
+                    }
+                    true
+                }
+                is MoveResult.Forbidden -> {
+                    // Рэндзю: запрещённая точка — киноварь + дрожание доски
+                    boardView.flashForbidden(r, c)
+                    shake(boardView, boardX)
+                    triggerHaptic()
+                    showForbiddenReason(hintContainer, theme, res.violation)
+                    false
+                }
+                is MoveResult.InvalidMove -> {
+                    shake(boardView, boardX)
+                    false
+                }
+                else -> false
+            }
         }
 
         undoAndRefresh = {
             if (game.getMoveCount() > 0) {
+                GameSession.undoUsed = true
+                // Отмена на завершённой партии возвращает её в PLAYING
+                // («Посмотреть доску» на экране финала → отмотать → доиграть).
+                if (game.gameState != GameState.PLAYING) GameSession.reopen()
                 game.undoMove()
                 if (mode == GameMode.AI && game.getMoveCount() > 0 && game.currentPlayer != humanColor) {
                     game.undoMove()
@@ -180,13 +237,17 @@ class GameScene : Scene() {
 
         boardView.onCellClickHandler = handler@{ r, c ->
             if (!isHumanTurn()) return@handler
-            // Режим подтверждения: первый тап — ghost-превью, повторный — фиксация.
+            // Режим подтверждения: тап — ghost-превью + панель «Поставить камень»,
+            // повторный тап той же клетки — фиксация.
             if (SettingsStore.current.confirmMoves) {
                 if (pendingMove != r to c) {
                     if (game.getBoard().isEmpty(r, c)) {
                         pendingMove = r to c
                         boardView.showGhost(r, c, isBlack = game.currentPlayer == StoneColor.BLACK)
                         triggerHaptic()
+                        renderControlsRef()
+                    } else {
+                        shake(boardView, boardX)
                     }
                     return@handler
                 }
@@ -195,16 +256,35 @@ class GameScene : Scene() {
             }
             if (!applyMoveRef(r, c)) return@handler
             if (mode == GameMode.AI && game.gameState == GameState.PLAYING) {
-                launch { aiTurn() }
+                launch { aiTurnRef() }
             }
+        }
+
+        aiTurnRef = turn@{
+            if (mode != GameMode.AI || game.gameState != GameState.PLAYING || game.currentPlayer != aiColor) return@turn
+            aiThinking = true
+            renderUi()
+            delay(450)
+            val pos = withContext(Dispatchers.Default) { ai.chooseMove(game) }
+            aiThinking = false
+            // Пока AI «думал», партию могли сбросить/откатить (кнопки блокируются
+            // через busy, но новая партия пересоздаёт сцену, а корутина живёт) —
+            // перепроверяем, что ход всё ещё за AI.
+            if (game !== GameSession.game || game.gameState != GameState.PLAYING ||
+                game.currentPlayer != aiColor
+            ) return@turn
+            applyMoveRef(pos.row, pos.col)
         }
 
         renderUi()
 
         if (mode == GameMode.AI && game.currentPlayer == aiColor && game.gameState == GameState.PLAYING) {
-            launch { aiTurn() }
+            launch { aiTurnRef() }
         }
     }
+
+    // aiTurn как var, чтобы ссылаться из renderControls (forward reference).
+    private var aiTurnRef: suspend () -> Unit = {}
 
     private val vibration by lazy { NativeVibration(coroutineContext) }
     private var stoneSound: Sound? = null
@@ -226,65 +306,121 @@ class GameScene : Scene() {
         }
     }
 
-    private fun renderTurnIndicator(host: Container, theme: KinPalette, aiThinking: Boolean) {
+    // Лепесток: 11×9 розовый овал, падает ~6.5 с с покачиванием и вращением.
+    private fun spawnPetal(host: Container, boardX: Double, boardY: Double) {
+        val x0 = boardX + 20.0 + Random.nextDouble() * (BoardSpec.TOTAL - 40.0)
+        val y0 = boardY - 6.0
+        val img = host.image(petalBitmap).apply {
+            anchor(0.5, 0.5)
+            scaleY = 0.82
+            position(x0, y0)
+            alpha = 0.0
+        }
+        var t = 0.0
+        var upd: Cancellable? = null
+        upd = img.addUpdater { dt ->
+            t += dt.milliseconds / 6500.0
+            if (t >= 1.0) {
+                img.removeFromParent()
+                upd?.cancel()
+                return@addUpdater
+            }
+            img.y = y0 + t * 340.0
+            img.x = x0 + sin(t * PI * 2.6) * 13.0
+            img.rotation = (t * 240.0).degrees
+            img.alpha = when {
+                t < 0.08 -> t / 0.08 * 0.8
+                t > 0.85 -> (1.0 - t) / 0.15 * 0.8
+                else -> 0.8
+            }
+        }
+    }
+
+    // Дрожание доски при недопустимом/запрещённом ходе.
+    private fun shake(view: View, baseX: Double) {
+        var t = 0.0
+        var upd: Cancellable? = null
+        upd = view.addUpdater { dt ->
+            t += dt.milliseconds / 320.0
+            if (t >= 1.0) {
+                view.x = baseX
+                upd?.cancel()
+            } else {
+                view.x = baseX + sin(t * PI * 4) * 3.0 * (1.0 - t)
+            }
+        }
+    }
+
+    // ── Чипы соперников: камень + имя (+★ победителю) + подпись, между ними vs.
+    private fun renderChips(host: Container, theme: KinPalette, aiThinking: Boolean) {
         host.removeChildren()
         val game = GameSession.game
-        val (label, color) = when {
-            aiThinking -> Str.GAME_AI_THINKING to game.currentPlayer
-            game.gameState == GameState.PLAYING -> when (game.currentPlayer) {
-                StoneColor.BLACK -> Str.TURN_BLACK to StoneColor.BLACK
-                StoneColor.WHITE -> Str.TURN_WHITE to StoneColor.WHITE
-            }
-            game.gameState == GameState.BLACK_WINS -> Str.BLACK_WINS to StoneColor.BLACK
-            game.gameState == GameState.WHITE_WINS -> Str.WHITE_WINS to StoneColor.WHITE
-            else -> Str.DRAW to StoneColor.BLACK
-        }
-        val isBlack = color == StoneColor.BLACK
+        val mode = GameSession.mode
         val gameOver = game.gameState != GameState.PLAYING
 
-        // Центрируем пару «камень + текст (+ ★)» по фактической ширине текста.
-        val txt = host.kinText(label, Type.bodyStrong, theme.ink) {
-            alignment = TextAlignment.MIDDLE_LEFT
+        val subB: String
+        val subW: String
+        if (mode == GameMode.AI) {
+            subB = if (humanColor == StoneColor.BLACK) Str.CHIP_YOU else Str.CHIP_AI
+            subW = if (humanColor == StoneColor.WHITE) Str.CHIP_YOU else Str.CHIP_AI
+        } else {
+            subB = Str.CHIP_P1
+            subW = Str.CHIP_P2
         }
-        val star = if (gameOver && game.gameState != GameState.DRAW) {
-            host.kinText("★", Type.bodyStrong.size, theme.gold, Fonts.uiSemiBold) {
+
+        val vs = host.kinText(Str.GAME_VS, Type.captionItalic.size, theme.muted, Fonts.serifItalic) {
+            alignment = TextAlignment.MIDDLE_CENTER
+            position(0.0, 10.0)
+        }
+
+        fun chip(color: StoneColor, label: String, sub: String, alignRight: Boolean) {
+            val active = !gameOver && game.currentPlayer == color
+            val won = game.winner == color
+            val c = host.container { }
+            val isBlack = color == StoneColor.BLACK
+            val stoneD = 14.0
+            c.kinStone(isBlack = isBlack, radius = stoneD / 2.0, theme = theme)
+                .position(stoneD / 2.0, 10.0)
+            val labelText = c.kinText(label, 13.0, theme.ink, Fonts.uiSemiBold) {
                 alignment = TextAlignment.MIDDLE_LEFT
+                position(stoneD + 8.0, 4.0)
             }
-        } else null
-
-        val stoneD = 12.0
-        val gap = 10.0
-        val starGap = 8.0
-        val totalW = stoneD + gap + txt.scaledWidth + (star?.let { starGap + it.scaledWidth } ?: 0.0)
-        var x = -totalW / 2.0
-        host.kinStone(isBlack = isBlack, radius = stoneD / 2.0, theme = theme)
-            .position(x + stoneD / 2.0, 0.0)
-        x += stoneD + gap
-        txt.position(x, 0.0)
-        x += txt.scaledWidth + starGap
-        star?.position(x, 0.0)
-    }
-
-    private fun renderHistoryDots(host: Container, theme: KinPalette) {
-        host.removeChildren()
-        val moves = GameSession.game.getMoveHistory().takeLast(5)
-        val gap = 12.0
-        moves.forEachIndexed { i, m ->
-            val x = -((moves.size - 1 - i) * gap)
-            val isBlack = m.player == StoneColor.BLACK
-            if (isBlack) {
-                host.circle(radius = 4.0, fill = theme.ink) { position(x, 0.0) }
-            } else {
-                host.circle(radius = 4.0, fill = theme.paper, stroke = theme.lineFirm, strokeThickness = 0.5) {
-                    position(x, 0.0)
+            var rowW = stoneD + 8.0 + labelText.scaledWidth
+            if (won) {
+                c.kinText("★", 13.0, theme.gold, Fonts.uiSemiBold) {
+                    alignment = TextAlignment.MIDDLE_LEFT
+                    position(rowW + 5.0, 4.0)
+                }
+                rowW += 5.0 + 14.0
+            }
+            val subText = c.kinText(capsTracked(sub, 1), 10.0, theme.muted, Fonts.uiMedium) {
+                alignment = TextAlignment.MIDDLE_LEFT
+                position(stoneD + 8.0, 19.0)
+            }
+            // Точки «AI думает» — после подписи чипа AI
+            val isAiChip = mode == GameMode.AI && color != humanColor
+            if (isAiChip && aiThinking) {
+                val dotsX = stoneD + 8.0 + subText.scaledWidth + 6.0
+                for (i in 0..2) {
+                    val dot = c.circle(1.5, theme.ink) { position(dotsX + i * 6.0, 18.0) }
+                    var t = i * -0.2
+                    dot.addUpdater { dt ->
+                        t += dt.milliseconds / 1300.0
+                        val phase = ((t % 1.0) + 1.0) % 1.0
+                        dot.alpha = 0.15 + 0.7 * (if (phase < 0.3) sin(phase / 0.3 * PI) else 0.0)
+                    }
                 }
             }
+            c.alpha = if (active || won) 1.0 else 0.45
+            c.position(if (alignRight) -20.0 - rowW else 20.0, 0.0)
         }
+
+        chip(StoneColor.BLACK, Str.CHIP_BLACK, subB, alignRight = true)
+        chip(StoneColor.WHITE, Str.CHIP_WHITE, subW, alignRight = false)
+        vs.position(0.0, 10.0)
     }
 
-    // Подсказка по запросу: кнопка с лимитом на партию (вместо постоянной
-    // подсветки, которая играла за игрока). Подсветка живёт до следующего
-    // redraw (т.е. до ближайшего хода/отмены).
+    // Подсказка по запросу: кнопка с лимитом на партию.
     private fun renderHintButton(
         host: Container, theme: KinPalette, boardView: KinBoardView, canHint: Boolean,
     ) {
@@ -303,91 +439,86 @@ class GameScene : Scene() {
         }
     }
 
-    // Финал партии: оверлей поверх доски — победную линию видно, из оверлея
-    // можно уйти «Посмотреть доску» (кнопки внизу продолжают работать,
-    // включая отмену победного хода).
-    private fun showVictoryOverlay(
-        host: Container, theme: KinPalette, winner: StoneColor?, moves: Int,
-    ) {
+    // Причина запрета рэндзю — киноварная строка под доской, гаснет сама.
+    private fun showForbiddenReason(host: Container, theme: KinPalette, violation: RenjuViolation) {
         host.removeChildren()
-        val w = Viewport.W.toDouble()
-        val h = Viewport.H.toDouble()
-
-        // Скрим гасит клики по доске.
-        val scrim = host.solidRect(w, h, RGBA(theme.paper.r, theme.paper.g, theme.paper.b, 150))
-        scrim.onClick { }
-
-        val panelW = w - 48.0
-        val panelH = 268.0
-        val panel = host.container { }.position(24.0, (h - panelH) / 2.0 - 40.0)
-        panel.solidRect(panelW, panelH, theme.surface)
-        panel.solidRect(panelW, 1.0, theme.lineFirm)
-        panel.solidRect(panelW, 1.0, theme.lineFirm) { y = panelH - 1.0 }
-        panel.solidRect(1.0, panelH, theme.lineFirm)
-        panel.solidRect(1.0, panelH, theme.lineFirm) { x = panelW - 1.0 }
-
-        val cx = panelW / 2.0
-        panel.kinText(Str.VICTORY_META, Type.meta, theme.muted) {
-            alignment = TextAlignment.TOP_CENTER
-            position(cx, 28.0)
+        val label = when (violation) {
+            RenjuViolation.OVERLINE -> Str.FORBIDDEN_OVERLINE
+            RenjuViolation.DOUBLE_FOUR -> Str.FORBIDDEN_DOUBLE_FOUR
+            RenjuViolation.DOUBLE_THREE -> Str.FORBIDDEN_DOUBLE_THREE
         }
-        panel.kinText(
-            when (winner) {
-                StoneColor.BLACK -> Str.BLACK_WINS
-                StoneColor.WHITE -> Str.WHITE_WINS
-                null -> Str.DRAW
-            },
-            28.0, theme.ink, Fonts.serif,
-        ) {
-            alignment = TextAlignment.TOP_CENTER
-            position(cx, 52.0)
-        }
-        panel.kinText(Str.GAME_MOVE_PREFIX + moves, Type.meta, theme.muted) {
-            alignment = TextAlignment.TOP_CENTER
-            position(cx, 92.0)
-        }
-        panel.container {
-            kinSeam(
-                x1 = 2.0, y1 = 8.0, x2 = panelW - 96.0, y2 = 6.0,
-                jitter = 3.0, seed = 81, width = 1.4, branches = true,
-                color = theme.gold, colorSoft = theme.goldSoft,
-            )
-        }.position(48.0, 112.0)
-
-        val btnW = panelW - 48.0
-        panel.kinButton(
-            width = btnW, label = Str.VICTORY_AGAIN, primary = true, centered = true,
-            theme = theme,
-            onPress = {
-                GameSession.newGame(GameSession.mode)
-                Nav.goGameKeepState()
-            },
-        ).position(24.0, 140.0)
-        panel.kinButton(
-            width = btnW, label = Str.VICTORY_TO_MENU, centered = true, theme = theme,
-            onPress = { Nav.goMenu() },
-        ).position(24.0, 140.0 + 52.0 + 10.0)
-
-        host.kinTextButton(Str.VICTORY_VIEW_BOARD, color = theme.muted) {
-            host.removeChildren()
-        }.apply {
+        val txt = host.kinText(label, Type.caption.size, theme.vermillion, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_CENTER
-            position(w / 2.0, (h - panelH) / 2.0 - 40.0 + panelH + 28.0)
+        }
+        var t = 0.0
+        var upd: Cancellable? = null
+        upd = txt.addUpdater { dt ->
+            t += dt.milliseconds / 1600.0
+            if (t >= 1.0) {
+                txt.removeFromParent()
+                upd?.cancel()
+            } else if (t > 0.7) {
+                txt.alpha = 1.0 - (t - 0.7) / 0.3
+            }
+        }
+    }
+
+    private companion object {
+        // Розовый градиентный овал — один битмап на все лепестки.
+        val petalBitmap: Bitmap by lazy {
+            Bitmap32Context2d(12, 12, true) {
+                fill(
+                    createRadialGradient(4.2, 4.2, 0.0, 6.0, 6.0, 5.6).also {
+                        it.addColorStop(0.0, Colors["#f2c7cb"])
+                        it.addColorStop(1.0, Colors["#dfa0aa"])
+                    },
+                ) { circle(Point(6.0, 6.0), 5.5) }
+            }
         }
     }
 
     private fun renderControls(
-        host: Container, theme: KinPalette, btnY: Double, btnW: Double,
-        game: GameLogic, busy: Boolean,
+        host: Container, theme: KinPalette, btnY: Double,
+        game: GameLogic, busy: Boolean, pending: Pair<Int, Int>?,
         onUndo: () -> Unit, onNew: () -> Unit,
+        onCancel: () -> Unit, onConfirm: () -> Unit,
     ) {
         host.removeChildren()
+        val w = Viewport.W.toDouble()
+
+        if (pending != null) {
+            // Подтверждение хода: координата · ✕ · «Поставить камень»
+            val (r, c) = pending
+            val coord = "${('A' + c)}${15 - r}"
+            host.kinText(coord, 24.0, theme.ink, Fonts.serif) {
+                alignment = TextAlignment.TOP_LEFT
+                position(24.0, btnY - 4.0)
+            }
+            host.kinText(
+                capsTracked(Str.GAME_MOVE_PREFIX + (game.getMoveCount() + 1), 0),
+                10.0, theme.muted, Fonts.uiMedium,
+            ) {
+                alignment = TextAlignment.TOP_LEFT
+                position(24.0, btnY + 26.0)
+            }
+            host.kinButton(
+                width = 44.0, label = Str.CONFIRM_CANCEL, small = true, centered = true,
+                theme = theme, onPress = onCancel,
+            ).position(84.0, btnY)
+            host.kinButton(
+                width = w - 140.0 - 24.0, label = Str.CONFIRM_PLACE,
+                primary = true, small = true, centered = true,
+                theme = theme, onPress = onConfirm,
+            ).position(140.0, btnY)
+            return
+        }
+
+        val btnW = (w - 24.0 * 2.0 - 10.0) / 2.0
         host.kinButton(
             width = btnW, label = Str.GAME_UNDO, small = true, centered = true, theme = theme,
-            // Как в дизайне: отмена доступна и после победы — undoMove
-            // сбрасывает состояние в PLAYING, партию можно продолжить.
             // busy: undo во время хода AI мутировал бы Board, который
             // chooseMove читает на Dispatchers.Default (data race).
+            // Отмена работает и после финала — партия возвращается в PLAYING.
             enabled = game.getMoveCount() > 0 && !busy,
             onPress = onUndo,
         ).position(24.0, btnY)

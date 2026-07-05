@@ -24,16 +24,18 @@ class HelpScene : Scene() {
                 position(24.0, 22.0)
             }
 
+        // Контент скроллится вертикальным drag-ом (6 секций не влезают в 720).
+        val content = container { }
         var y = 56.0
 
-        kinText(Str.HELP_TITLE, Type.title, theme.ink) {
+        content.kinText(Str.HELP_TITLE, Type.title, theme.ink) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
         y += 44.0
 
         // Жила с ответвлением (Help-вариант)
-        container {
+        content.container {
             kinSeam(
                 x1 = 2.0, y1 = 9.0, x2 = 108.0, y2 = 11.0,
                 jitter = 3.0, seed = 53, width = 1.3, branches = true,
@@ -42,15 +44,23 @@ class HelpScene : Scene() {
         }.position(24.0, y - 4.0)
         y += 16.0
 
-        kinText(Str.HELP_SECTION, Type.labelCaps, theme.muted) {
+        content.kinText(Str.HELP_SECTION, Type.labelCaps, theme.muted) {
             alignment = TextAlignment.TOP_LEFT
             position(24.0, y)
         }
         y += 36.0
 
         for (entry in Str.helpEntries) {
-            renderEntry(this, y, entry, theme)
+            renderEntry(content, y, entry, theme)
             y += entryHeight(entry, theme) + 16.0
+        }
+
+        val contentH = y + 24.0
+        val minY = (h - contentH).coerceAtMost(0.0)
+        var baseY = 0.0
+        onMouseDrag { info ->
+            if (info.start) baseY = content.y
+            content.y = (baseY + info.dy).coerceIn(minY, 0.0)
         }
     }
 

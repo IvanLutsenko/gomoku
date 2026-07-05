@@ -11,9 +11,14 @@ import kotlin.coroutines.EmptyCoroutineContext
 @Serializable
 enum class PlayerColorPref { ALTERNATE, WHITE, BLACK }
 
+// Правила: классика (любые пять и длиннее) или рэндзю (запреты для чёрных).
+@Serializable
+enum class Rules { CLASSIC, RENJU }
+
 @Serializable
 data class Settings(
     val dark: Boolean = false,
+    val rules: Rules = Rules.CLASSIC,
     val aiDifficulty: Difficulty = Difficulty.MID,
     val hints: Boolean = false,
     val sound: Boolean = true,
@@ -21,6 +26,12 @@ data class Settings(
     val confirmMoves: Boolean = false,
     val playerColor: PlayerColorPref = PlayerColorPref.ALTERNATE,
     val firstRun: Boolean = true,
+    // Момент первого запуска (unix ms), ставится один раз в main.kt.
+    // Правилами рекламы больше не используется, но дату установки задним
+    // числом не восстановить — копим для будущей аналитики. 0 = не проставлен.
+    val firstRunAt: Long = 0,
+    // Покупка «Тишина» из Чайной — убирает рекламу навсегда.
+    val adsRemoved: Boolean = false,
 )
 
 // In-memory + lazy persistence в applicationDataVfs. Save идёт фоновой

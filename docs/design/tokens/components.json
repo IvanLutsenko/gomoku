@@ -1,13 +1,14 @@
 {
   "buttons": {
+    "$comment": "Редизайн 2026-07: форма «Округлые» (r=10), тон primary — «Киноварь» (TWEAK_DEFAULTS дизайн-проекта).",
     "primary": {
-      "bg": "ink",
-      "fg": "paper",
+      "bg": "vermillion",
+      "fg": "#f7f1e4",
       "border": null,
       "padding": [18, 24],
       "padding_compact": [13, 16],
       "font_style": "button",
-      "corner_radius": 0,
+      "corner_radius": 10,
       "min_height": 52
     },
     "secondary": {
@@ -17,7 +18,7 @@
       "padding": [18, 24],
       "padding_compact": [13, 16],
       "font_style": "button",
-      "corner_radius": 0,
+      "corner_radius": 10,
       "min_height": 52
     },
     "tertiary_text": {
@@ -41,8 +42,8 @@
     "item": {
       "padding": [12, 0],
       "font_style": "caption",
-      "active_bg": "ink",
-      "active_fg": "paper",
+      "active_bg": "vermillion",
+      "active_fg": "#f7f1e4",
       "inactive_fg": "ink",
       "border_left": { "color": "line_firm", "width": 1, "first_item": false }
     }
@@ -51,7 +52,7 @@
     "size": [44, 24],
     "track_off_light": { "rgba": [0, 0, 0, 0.15] },
     "track_off_dark":  { "rgba": [1, 0.992, 0.961, 0.18] },
-    "track_on": "ink",
+    "track_on": "vermillion",
     "thumb": "paper",
     "thumb_size": 20,
     "thumb_inset": 2,

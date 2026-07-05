@@ -7,8 +7,7 @@ import korlibs.io.lang.*
 import korlibs.time.*
 import logic.*
 import model.*
-import kotlin.math.min
-import kotlin.math.roundToInt
+import kotlin.math.*
 
 class KinBoardView(
     private val game: GameLogic,
@@ -151,6 +150,20 @@ class KinBoardView(
         } else {
             seamAnimated = false
         }
+
+        // Пульсирующий тэнгэн на пустой доске — приглашение к первому ходу.
+        if (moveCount == 0) {
+            val dot = stonesLayer.circle(4.0, theme.gold) {
+                position(pad + 7 * cell - 4.0, pad + 7 * cell - 4.0)
+            }
+            var t = 0.0
+            dot.addUpdater { dt ->
+                t += dt.milliseconds / 1800.0
+                val k = (sin(t * 2.0 * PI) + 1.0) / 2.0
+                dot.alpha = 0.2 + 0.45 * k
+                dot.scale(1.0 + 0.5 * k)
+            }
+        }
     }
 
     // Появление камня: scale 0.7→1.0 с лёгким overshoot за ~120 мс (ease-out-back).
@@ -170,16 +183,50 @@ class KinBoardView(
         }
     }
 
-    // Ghost stone — полупрозрачное превью хода (режим подтверждения).
+    // Ghost stone — полупрозрачное превью хода (режим подтверждения):
+    // киноварное перекрестие через клетку + камень-призрак с кольцом.
     fun showGhost(r: Int, c: Int, isBlack: Boolean) {
         ghostLayer.removeChildren()
+        val crossColor = RGBA(theme.vermillion.r, theme.vermillion.g, theme.vermillion.b, (255 * 0.22).toInt())
+        val lineLen = cell * (BoardSpec.SIZE_CELLS - 1)
+        ghostLayer.solidRect(1.0, lineLen, crossColor) { position(pad + c * cell, pad) }
+        ghostLayer.solidRect(lineLen, 1.0, crossColor) { position(pad, pad + r * cell) }
+        val stoneR = cell * BoardSpec.STONE_RADIUS_RATIO
         ghostLayer.kinStone(
             isBlack = isBlack,
-            radius = cell * BoardSpec.STONE_RADIUS_RATIO,
+            radius = stoneR,
             theme = theme,
         ).apply {
             position(pad + c * cell, pad + r * cell)
-            alpha = 0.45
+            alpha = 0.55
+        }
+        ghostLayer.circle(
+            stoneR + 4.0, Colors.TRANSPARENT,
+            stroke = theme.vermillion, strokeThickness = 1.0,
+        ).apply {
+            position(pad + c * cell - stoneR - 4.0, pad + r * cell - stoneR - 4.0)
+            alpha = 0.9
+        }
+    }
+
+    // Рэндзю: вспышка киноварного кольца на запрещённой точке.
+    fun flashForbidden(r: Int, c: Int) {
+        val ring = ghostLayer.circle(
+            cell * 0.5, Colors.TRANSPARENT,
+            stroke = theme.vermillion, strokeThickness = 1.5,
+        ).apply {
+            position(pad + c * cell - cell * 0.5, pad + r * cell - cell * 0.5)
+        }
+        var t = 0.0
+        var upd: Cancellable? = null
+        upd = ring.addUpdater { dt ->
+            t += dt.milliseconds / 700.0
+            if (t >= 1.0) {
+                ring.removeFromParent()
+                upd?.cancel()
+            } else {
+                ring.alpha = 1.0 - t * t
+            }
         }
     }
 

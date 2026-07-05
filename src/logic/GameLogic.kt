@@ -3,9 +3,10 @@ package logic
 import model.*
 
 /**
- * Основная игровая логика Gomoku
+ * Основная игровая логика Gomoku.
+ * @param renju включает запреты рэндзю для чёрных (см. RenjuRules).
  */
-class GameLogic {
+class GameLogic(val renju: Boolean = false) {
     private val board = Board()
     
     var currentPlayer = StoneColor.BLACK
@@ -40,7 +41,13 @@ class GameLogic {
         if (!board.isEmpty(row, col)) {
             return MoveResult.InvalidMove("Клетка уже занята")
         }
-        
+
+        if (renju && currentPlayer == StoneColor.BLACK) {
+            RenjuRules.violation(board, row, col)?.let {
+                return MoveResult.Forbidden(it, Position(row, col))
+            }
+        }
+
         // Размещаем камень
         board.placeStone(row, col, currentPlayer)
         
@@ -135,7 +142,11 @@ class GameLogic {
     fun getMoveHistory(): List<Move> = board.moveHistory
     
     fun canMakeMove(row: Int, col: Int): Boolean {
-        return gameState == GameState.PLAYING && board.isEmpty(row, col)
+        if (gameState != GameState.PLAYING || !board.isEmpty(row, col)) return false
+        if (renju && currentPlayer == StoneColor.BLACK &&
+            RenjuRules.violation(board, row, col) != null
+        ) return false
+        return true
     }
 }
 
@@ -150,6 +161,9 @@ sealed class MoveResult {
     
     data class InvalidMove(val reason: String) : MoveResult()
     data class GameEnded(val reason: String) : MoveResult()
+
+    /** Запрещённый по рэндзю ход чёрных — клетка пустая, но ставить нельзя. */
+    data class Forbidden(val violation: RenjuViolation, val position: Position) : MoveResult()
 }
 
 sealed class UndoResult {

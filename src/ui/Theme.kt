@@ -33,7 +33,7 @@ val KIN_LIGHT = KinPalette(
     surface    = rgba("#faf6ec"),
     ink        = rgba("#1a1814"),
     inkSoft    = rgba("#3a3530"),
-    muted      = rgba("#8a8378"),
+    muted      = rgba("#6f695f"),
     line       = rgba("#1a1814", 0.10),
     lineFirm   = rgba("#1a1814", 0.32),
     vermillion = rgba("#c1442a"),
@@ -48,7 +48,7 @@ val KIN_DARK = KinPalette(
     surface    = rgba("#0e0d0a"),
     ink        = rgba("#f0ede4"),
     inkSoft    = rgba("#bdb8ad"),
-    muted      = rgba("#6a6760"),
+    muted      = rgba("#857f72"),
     line       = rgba("#fffdf5", 0.08),
     lineFirm   = rgba("#fffdf5", 0.22),
     vermillion = rgba("#d35a3e"),
@@ -56,6 +56,14 @@ val KIN_DARK = KinPalette(
     goldSoft   = rgba("#e9c476"),
     isDark     = true,
 )
+
+// Кнопки — редизайн 2026-07: форма «Округлые» (r=10), тон primary —
+// «Киноварь» (уруси-лак). Источник — TWEAK_DEFAULTS дизайн-проекта.
+object BtnSpec {
+    const val RADIUS = 10.0
+    val primaryFg: RGBA = rgba("#f7f1e4")
+    fun primaryBg(theme: KinPalette): RGBA = theme.vermillion
+}
 
 // Stones (theme-dependent — black-on-dark needs special treatment).
 data class StonePalette(

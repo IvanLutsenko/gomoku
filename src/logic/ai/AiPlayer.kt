@@ -33,7 +33,7 @@ private class RandomNearAi : AiPlayer {
     override fun chooseMove(game: GameLogic): Position {
         val board = game.getBoard()
         if (board.moveCount == 0) return Position(7, 7)
-        val candidates = candidateCells(board, radius = 2)
+        val candidates = legalCandidates(game, radius = 2)
         return candidates.random(Random.Default)
     }
 }
@@ -53,7 +53,7 @@ class HeuristicAi(
 
         if (board.moveCount == 0) return Position(7, 7)
 
-        val candidates = candidateCells(board, radius = neighborhood)
+        val candidates = legalCandidates(game, radius = neighborhood)
         val scored = candidates
             .map { it to scoreMove(board, it.row, it.col, me, opp, opponentBias) }
             .sortedByDescending { it.second }
@@ -112,6 +112,17 @@ fun scoreMove(
     // одни и те же диапазоны для обеих сторон). opponentBias < 1 чтобы
     // при равном выборе предпочитать собственную атаку защите.
     return attack + (defense * opponentBias).toLong() + centerBonus
+}
+
+// Кандидаты с учётом запретов рэндзю (AI за чёрных не должен зависать на
+// запрещённом ходе). Если все соседние клетки запрещены — любая легальная.
+fun legalCandidates(game: GameLogic, radius: Int): List<Position> {
+    val near = candidateCells(game.getBoard(), radius)
+    if (!game.renju) return near
+    val legal = near.filter { game.canMakeMove(it.row, it.col) }
+    if (legal.isNotEmpty()) return legal
+    return game.getBoard().getEmptyPositions().filter { game.canMakeMove(it.row, it.col) }
+        .ifEmpty { near } // все запрещены — сдаёмся правилам, ход всё равно отклонится
 }
 
 // Поиск кандидатов: все пустые клетки в радиусе `radius` от занятых.

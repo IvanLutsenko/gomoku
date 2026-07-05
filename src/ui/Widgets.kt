@@ -19,7 +19,7 @@ private val cyrillicAll = CharacterSet(
     "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" +
         "абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
 )
-private val extraChars = CharacterSet("五目一二三四→☀☾·«»—–•★")
+private val extraChars = CharacterSet("五目一二三四六並思考中初連速心師白石月友和極茶壺銀銅貝静→☀☾·«»—–•★×…₽")
 private val kinChars = CharacterSet.LATIN_ALL + cyrillicAll + extraChars
 
 private val bitmapFontCache = mutableMapOf<Pair<Font, Double>, BitmapFont>()
@@ -58,9 +58,9 @@ fun Container.kinText(
 ): Text = kinText(label, type.size, color, type.font(), block)
 
 // ───────── Paper background ─────────
-// Бумага + два мягких radial-wash-а (KinScreen из редизайна): свет — две тёмные
-// «тени» по углам, тьма — тёплый блик и золотистое свечение. Битмап кешируется
-// по теме, все сцены используют один.
+// Бумага + сэйгайха (еле заметный узор волн, ~4% opacity) + два мягких
+// radial-wash-а (KinScreen из редизайна): свет — две тёмные «тени» по углам,
+// тьма — тёплый блик и золотистое свечение. Битмап кешируется по теме.
 private val paperCache = mutableMapOf<Boolean, Bitmap>()
 
 fun Container.kinPaperBackground(theme: KinPalette = Theme.colors) {
@@ -69,6 +69,30 @@ fun Container.kinPaperBackground(theme: KinPalette = Theme.colors) {
     solidRect(w, h, theme.paper)
     val bm = paperCache.getOrPut(theme.isDark) {
         korlibs.image.bitmap.Bitmap32Context2d(Viewport.W, Viewport.H, true) {
+            // Сэйгайха: веера из трёх дуг (r = 28/14/7) на решётке 28×14 —
+            // эквивалент двух смещённых CSS-слоёв 56×28 из макета.
+            val ink = theme.ink
+            val waveColor = RGBA(ink.r, ink.g, ink.b, (255 * (if (theme.isDark) 0.035 else 0.04)).toInt())
+            stroke(korlibs.image.paint.ColorPaint(waveColor), lineWidth = 0.8) {
+                var row = 0
+                var cy = 14.0
+                while (cy < h + 28.0) {
+                    var cx = if (row % 2 == 0) 14.0 else 28.0
+                    while (cx < w + 28.0) {
+                        for (r in listOf(28.0, 14.0, 7.0)) {
+                            moveTo(korlibs.math.geom.Point(cx - r, cy))
+                            arc(
+                                korlibs.math.geom.Point(cx, cy), r,
+                                korlibs.math.geom.Angle.HALF, korlibs.math.geom.Angle.FULL,
+                            )
+                        }
+                        cx += 28.0
+                    }
+                    cy += 14.0
+                    row++
+                }
+            }
+
             val radius = hypot(w, h) * 0.5
             fun wash(cx: Double, cy: Double, color: RGBA) {
                 fill(
@@ -90,15 +114,8 @@ fun Container.kinPaperBackground(theme: KinPalette = Theme.colors) {
     image(bm)
 }
 
-// Тонкие ребра 1 px цветом line_firm — рамка кнопки/сегмента/поля.
-private fun Container.borderRect(width: Double, height: Double, color: RGBA) {
-    solidRect(width, 1.0, color)
-    solidRect(width, 1.0, color) { y = height - 1.0 }
-    solidRect(1.0, height, color)
-    solidRect(1.0, height, color) { x = width - 1.0 }
-}
-
 // ───────── Buttons ─────────
+// Редизайн: форма «Округлые» (r=10), primary — киноварь (BtnSpec).
 
 fun Container.kinButton(
     width: Double,
@@ -115,11 +132,16 @@ fun Container.kinButton(
     val padH = if (small) 16.0 else 24.0
     val typo = if (small) Type.buttonSmall else Type.button
 
-    val bgColor = if (primary) theme.ink else Colors.TRANSPARENT
-    val fgColor = if (primary) theme.paper else theme.ink
+    val fgColor = if (primary) BtnSpec.primaryFg else theme.ink
 
-    solidRect(width, height, bgColor)
-    if (!primary) borderRect(width, height, theme.lineFirm)
+    if (primary) {
+        roundRect(Size(width, height), RectCorners(BtnSpec.RADIUS), fill = BtnSpec.primaryBg(theme))
+    } else {
+        roundRect(
+            Size(width, height), RectCorners(BtnSpec.RADIUS),
+            fill = Colors.TRANSPARENT, stroke = theme.lineFirm, strokeThickness = 1.0,
+        )
+    }
 
     val mainText = kinText(label, typo, fgColor) {
         alignment = if (centered) TextAlignment.MIDDLE_CENTER else TextAlignment.MIDDLE_LEFT
@@ -184,8 +206,11 @@ fun Container.kinToggle(
     val h = 24.0
 
     val trackOff = if (theme.isDark) rgba255(255, 253, 245, 0.18) else rgba255(0, 0, 0, 0.15)
+    val trackOn = BtnSpec.primaryBg(theme)
 
-    val track = roundRect(Size(w, h), RectCorners(h / 2.0), fill = if (on) theme.ink else trackOff)
+    // fill=WHITE, цвет через colorMul — иначе смена цвета пересоздавала бы shape
+    val track = roundRect(Size(w, h), RectCorners(h / 2.0), fill = Colors.WHITE)
+        .also { it.colorMul = if (on) trackOn else trackOff }
     val r = 10.0
     val cy = h / 2.0
     val cxOff = h / 2.0          // 12 — thumb-центр в left position
@@ -200,7 +225,7 @@ fun Container.kinToggle(
 
     solidRect(w, h, Colors.TRANSPARENT).onClick {
         on = !on
-        track.colorMul = if (on) theme.ink else trackOff
+        track.colorMul = if (on) trackOn else trackOff
         val cx = if (on) cxOn else cxOff
         thumb.x = cx - r
         shadow.x = cx - r
@@ -221,19 +246,31 @@ fun Container.kinSegmented(
     val itemWidth = totalWidth / items.size
     var current = initialIndex
 
-    val bgs = mutableListOf<SolidRect>()
+    val activeBg = BtnSpec.primaryBg(theme)
+    val activeFg = BtnSpec.primaryFg
+    val r = BtnSpec.RADIUS - 1.0 // чуть меньше внешней рамки, чтобы сидеть внутри
+
+    val bgs = mutableListOf<RoundRect>()
     val txts = mutableListOf<Text>()
 
     items.forEachIndexed { i, label ->
         val isActive = i == current
-        val bg = solidRect(itemWidth, height, if (isActive) theme.ink else Colors.TRANSPARENT) {
+        // Скругление только на внешних углах крайних сегментов.
+        val corners = RectCorners(
+            if (i == 0) r else 0.0,
+            if (i == items.size - 1) r else 0.0,
+            if (i == items.size - 1) r else 0.0,
+            if (i == 0) r else 0.0,
+        )
+        val bg = roundRect(Size(itemWidth, height), corners, fill = Colors.WHITE) {
             x = i * itemWidth
+            colorMul = if (isActive) activeBg else Colors.TRANSPARENT
         }
         bgs += bg
         if (i > 0) {
             solidRect(1.0, height, theme.lineFirm) { x = i * itemWidth }
         }
-        val tx = kinText(label, Type.caption.size, if (isActive) theme.paper else theme.ink, Fonts.uiMedium) {
+        val tx = kinText(label, Type.caption.size, if (isActive) activeFg else theme.ink, Fonts.uiMedium) {
             alignment = TextAlignment.MIDDLE_CENTER
             position(i * itemWidth + itemWidth / 2.0, height / 2.0)
         }
@@ -241,7 +278,10 @@ fun Container.kinSegmented(
     }
 
     // Внешняя рамка поверх
-    borderRect(totalWidth, height, theme.lineFirm)
+    roundRect(
+        Size(totalWidth, height), RectCorners(BtnSpec.RADIUS),
+        fill = Colors.TRANSPARENT, stroke = theme.lineFirm, strokeThickness = 1.0,
+    )
 
     // Hit-targets поверх (после фонов и рамки чтобы клики не блокировались)
     items.forEachIndexed { i, _ ->
@@ -250,8 +290,8 @@ fun Container.kinSegmented(
             onClick {
                 if (current == i) return@onClick
                 current = i
-                bgs.forEachIndexed { j, b -> b.color = if (j == current) theme.ink else Colors.TRANSPARENT }
-                txts.forEachIndexed { j, t -> t.color = if (j == current) theme.paper else theme.ink }
+                bgs.forEachIndexed { j, b -> b.colorMul = if (j == current) activeBg else Colors.TRANSPARENT }
+                txts.forEachIndexed { j, t -> t.color = if (j == current) activeFg else theme.ink }
                 onChange(i)
             }
         }
